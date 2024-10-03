@@ -14,8 +14,20 @@ func main() {
 	}
 
 	db, _ := NewStore()
+	// db.Migrator().DropTable(
+	// 	types.DeliveredHistory{},
+	// 	types.Order{},
+	// )
+	// db.AutoMigrate(
+	// 	types.DeliveredHistory{},
+	// 	types.Order{},
+	// )
+	// err = types.ApplyDBSetup(db)
+	// if err != nil {
+	// 	log.Fatalf("Error applying DB setup %v", err)
+	// }
+
 	cld := util.NewCloudinary()
 
 	NewHttpServer(db, cld)
-
 }

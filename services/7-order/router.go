@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	BASE_PATH = "api/v1/chat"
+	BASE_PATH = "api/v1/order"
 )
 
 func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App) {
@@ -27,6 +27,18 @@ func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App) {
 	api := app.Group(BASE_PATH)
 	api.Use(verifyGatewayReq)
 	api.Use(authOnly)
+
+	api.Get("/:orderId", nil)
+	api.Get("/buyer/:buyerId", nil)
+	api.Get("/seller/:sellerId", nil)
+	api.Post("/create-payment-intent", nil)
+	api.Post("", nil)
+	api.Patch("/cancel/:orderId", nil)
+	api.Put("/gig/:type/:gigId", nil)
+	api.Patch("/extend-time/:orderId", nil)
+	api.Patch("/deliver-order/:orderId", nil)
+	api.Get("/notifications", nil)
+	api.Patch("/notification/mark-as-read", nil)
 
 }
 
