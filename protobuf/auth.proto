@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+option go_package="github.com/Akihira77/common/auth";
+import "google/protobuf/timestamp.proto";
+
+message FindUserRequest {
+    string userId = 1;
+}
+
+message FindUserResponse {
+    string id                     = 1;
+    string username               = 2;
+    string email                  = 3;
+    string password               = 4;
+    string profilePublicID        = 5;
+    string country                = 6;
+    string profilePicture         = 7;
+    bool emailVerified          = 9;
+    string emailVerificationToken = 8;
+    string passwordResetToken     = 10;
+    google.protobuf.Timestamp createdAt              = 11;
+    google.protobuf.Timestamp passwordResetExpires   = 12;
+}
+
+service AuthService {
+    rpc FindUserByUserID(FindUserRequest) returns (FindUserResponse) {}
+}
+

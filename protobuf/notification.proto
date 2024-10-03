@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+option go_package="github.com/Akihira77/common/notification";
+import "google/protobuf/empty.proto";
+
+//INFO: AUTH SERVICE
+message VerifyingEmailRequest {
+    string receiverEmail = 1;
+    string htmlTemplateName = 2;
+    string verifyLink = 3;
+}
+
+message ForgotPasswordRequest {
+    string receiverEmail = 1;
+    string htmlTemplateName = 2;
+    string resetLink = 3;
+    string username = 4;
+}
+		
+message SuccessResetPasswordRequest {
+    string receiverEmail = 1;
+    string htmlTemplateName = 2;
+    string username = 4;
+}
+
+//INFO: CHAT SERVICE
+message EmailChatNotificationRequest {
+    string receiverEmail = 1;
+    string senderEmail = 2;
+    string message = 3;
+}
+
+service NotificationService {
+    // From Auth Service
+    rpc UserVerifyingEmail(VerifyingEmailRequest) returns (google.protobuf.Empty) {}
+    rpc UserForgotPassword(ForgotPasswordRequest) returns (google.protobuf.Empty) {}
+    rpc UserSucessResetPassword(SuccessResetPasswordRequest) returns (google.protobuf.Empty) {}
+
+
+    // From Chat Service
+    rpc SendEmailChatNotification(EmailChatNotificationRequest) returns (google.protobuf.Empty) {}
+}
