@@ -1,12 +1,38 @@
 package types
 
 import (
+	"database/sql/driver"
 	"mime/multipart"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+type offerStatus string
+
+const (
+	PENDING  offerStatus = "PENDING"
+	CANCELED offerStatus = "CANCELED"
+	ACCEPTED offerStatus = "ACCEPTED"
+)
+
+func (p *offerStatus) Scan(value interface{}) error {
+	*p = offerStatus(value.([]byte))
+	return nil
+}
+
+func (p offerStatus) Value() (driver.Value, error) {
+	return string(p), nil
+}
+
+type Offer struct {
+	GigTitle             string      `json:"gigTitle" form:"gigTitle" validate:"required"`
+	Price                uint        `json:"price" form:"price" validate:"required"`
+	ExpectedDeliveryDays uint        `json:"expectedDeliveryDays" form:"expectedDeliveryDays"`
+	Description          string      `json:"description" form:"description"`
+	Status               offerStatus `json:"status" gorm:"not null; type:offer_status; default:'PENDING';"`
+}
 
 type Message struct {
 	ID             uuid.UUID `json:"id" gorm:"primaryKey;type:uuid;default:uuid_generate_v4();"`
@@ -17,15 +43,6 @@ type Message struct {
 	CreatedAt      time.Time `json:"createdAt" gorm:"not null;"`
 	ConversationID string    `json:"conversationId" gorm:"not null;"`
 	SenderID       string    `json:"senderId"`
-}
-
-type Offer struct {
-	GigTitle             string `json:"gigTitle" form:"gigTitle" validate:"required"`
-	Price                uint   `json:"price" form:"price" validate:"required"`
-	ExpectedDeliveryDays uint   `json:"expectedDeliveryDays" form:"expectedDeliveryDays"`
-	Description          string `json:"description" form:"description"`
-	Accepted             bool   `json:"accepted" gorm:"not null;default:false"`
-	Cancelled            bool   `json:"cancelled" gorm:"not null;default:false"`
 }
 
 type MessageDTO struct {
