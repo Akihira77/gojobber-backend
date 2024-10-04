@@ -20,6 +20,14 @@ const (
 	COMPLETED orderStatus = "COMPLETED"
 )
 
+var OrderStatuses = []string{
+	string(PENDING),
+	string(PROCESS),
+	string(CANCELED),
+	string(REFUNDED),
+	string(COMPLETED),
+}
+
 func (p *orderStatus) Scan(value interface{}) error {
 	*p = orderStatus(value.([]byte))
 	return nil
