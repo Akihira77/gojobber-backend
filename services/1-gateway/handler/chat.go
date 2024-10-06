@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
@@ -66,6 +67,36 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 			"errs": errs,
 		})
 	}
+
+	type InsertMsgRes struct {
+		SenderID string `json:"senderId"`
+		Receiver struct {
+			ID             string `json:"id"`
+			Username       string `json:"username"`
+			ProfilePicture string `json:"profilePicture"`
+		} `json:"receiver"`
+		UnreadMessages int `json:"unreadMessages"`
+	}
+
+	var res InsertMsgRes
+	_ = json.Unmarshal(body, &res)
+	msg := struct {
+		Topic    string `json:"topic"`
+		SenderID string `json:"senderId"`
+		Receiver struct {
+			ID             string `json:"id"`
+			Username       string `json:"username"`
+			ProfilePicture string `json:"profilePicture"`
+		} `json:"receiver"`
+		UnreadMessages int `json:"unreadMessages"`
+	}{
+		Topic:          "Chat-Notification",
+		SenderID:       res.SenderID,
+		Receiver:       res.Receiver,
+		UnreadMessages: res.UnreadMessages,
+	}
+	b, _ := json.Marshal(msg)
+	go SendMessage(res.SenderID, res.Receiver.ID, b)
 
 	return c.Status(statusCode).Send(body)
 }

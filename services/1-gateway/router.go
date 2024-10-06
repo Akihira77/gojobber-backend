@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	BASE_PATH = "api/v1/gateway"
+	BASE_PATH = "/api/v1/gateway"
 )
 
 func generateGatewayToken(c *fiber.Ctx) error {
@@ -41,6 +41,8 @@ func MainRouter(app *fiber.App) {
 	REVIEW_URL := os.Getenv("REVIEW_URL")
 	api := app.Group(BASE_PATH)
 	api.Use(generateGatewayToken)
+
+	handler.WsUpgrade(api)
 
 	authRouter(AUTH_URL, api.Group("/auth"))
 	userRouter(USER_URL, api.Group("/user"))

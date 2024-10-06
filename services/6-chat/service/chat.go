@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/Akihira77/gojobber/services/6-chat/types"
@@ -15,7 +16,8 @@ type ChatService struct {
 type ChatServiceImpl interface {
 	GetAllMyConversations(ctx context.Context, userID string) ([]types.UserConversationDTO, error)
 	GetMessages(ctx context.Context, conversationID string) ([]types.MessageDTO, error)
-	InsertMessage(ctx context.Context, senderId string, data *types.CreateMessageDTO) (*types.Message, error)
+	InsertMessage(ctx context.Context, senderID string, data *types.CreateMessageDTO) (*types.Message, error)
+	CalculateUnreadMessages(ctx context.Context, conversationID, senderID string) int
 }
 
 func NewChatService(db *gorm.DB) ChatServiceImpl {
@@ -60,14 +62,14 @@ func (cs *ChatService) GetAllMyConversations(ctx context.Context, userID string)
 	return conversations, result.Error
 }
 
-func (cs *ChatService) InsertMessage(ctx context.Context, senderId string, data *types.CreateMessageDTO) (*types.Message, error) {
+func (cs *ChatService) InsertMessage(ctx context.Context, senderID string, data *types.CreateMessageDTO) (*types.Message, error) {
 	tx := cs.db.
 		Debug().
 		WithContext(ctx).
 		Begin()
 
 	conv := types.Conversation{
-		UserOneID: senderId,
+		UserOneID: senderID,
 		UserTwoID: data.ReceiverID,
 	}
 	result := tx.
@@ -75,18 +77,28 @@ func (cs *ChatService) InsertMessage(ctx context.Context, senderId string, data 
 		FirstOrCreate(
 			&conv,
 			`(user_one_id = ? AND user_two_id = ?) OR (user_one_id = ? AND user_two_id = ?)`,
-			senderId, data.ReceiverID, senderId, data.ReceiverID)
+			senderID, data.ReceiverID, senderID, data.ReceiverID)
+	if result.Error != nil {
+		tx.Rollback()
+		return nil, result.Error
+	}
+
+	// mark all unread messages as read
+	result = tx.
+		Model(&types.Message{}).
+		Update("unread", false).
+		Where("messages.sender_id = ? AND messages.conversation_id = ?", data.ReceiverID, conv.ID)
 	if result.Error != nil {
 		tx.Rollback()
 		return nil, result.Error
 	}
 
 	msg := types.Message{
-		SenderID:       senderId,
+		SenderID:       senderID,
 		Body:           data.Body,
 		FileURL:        data.FileURL,
 		Offer:          data.Offer,
-		Unread:         false,
+		Unread:         true,
 		CreatedAt:      time.Now(),
 		ConversationID: conv.ID.String(),
 	}
@@ -101,4 +113,23 @@ func (cs *ChatService) InsertMessage(ctx context.Context, senderId string, data 
 
 	result = tx.Commit()
 	return &msg, result.Error
+}
+
+func (cs *ChatService) CalculateUnreadMessages(ctx context.Context, conversationID, senderID string) int {
+	var count int64
+
+	result := cs.db.
+		Debug().
+		WithContext(ctx).
+		Model(&types.Message{}).
+		Select("COUNT(CASE WHEN messages.unread = TRUE THEN 1 END) AS count").
+		Where("messages.sender_id = ? AND messages.conversation_id = ?", senderID, conversationID).
+		Scan(&count)
+
+	if result.Error != nil {
+		log.Println("CalculateUnreadMessages error", result.Error)
+		return 0
+	}
+
+	return int(count)
 }

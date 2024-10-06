@@ -158,7 +158,7 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "Error saving message")
 	}
 
-	_, err = authGrpcClient.FindUserByUserID(ctx, &auth.FindUserRequest{
+	receiverUser, err := authGrpcClient.FindUserByUserID(ctx, &auth.FindUserRequest{
 		UserId: data.ReceiverID,
 	})
 	if err != nil {
@@ -190,14 +190,14 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 		data.FileURL = uploadResult.SecureURL
 	}
 
-	result, err := ch.cs.InsertMessage(ctx, userInfo.UserID, data)
+	chat, err := ch.cs.InsertMessage(ctx, userInfo.UserID, data)
 	if err != nil {
 		fmt.Printf("InsertMessage Error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error saving your chat")
 	}
 
 	message := ""
-	if result.Offer != nil {
+	if chat.Offer != nil {
 		//TODO: SET HTML TEMPLATE FOR INFORMATION ABOUT THE OFFER
 		message = fmt.Sprintf("You receive a Gig Offer from seller: %s", userInfo.Email)
 	}
@@ -215,7 +215,6 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 			SenderEmail:   userInfo.Email,
 			Message:       message,
 		})
-
 	}()
 
 	// if err != nil {
@@ -223,7 +222,12 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 	// 	return fiber.NewError(http.StatusInternalServerError, "Error sending email")
 	// }
 
+	unreadMessages := ch.cs.CalculateUnreadMessages(ctx, chat.ConversationID, userInfo.UserID)
+
 	return c.Status(http.StatusCreated).JSON(fiber.Map{
-		"chat": result,
+		"senderId":       userInfo.UserID,
+		"receiver":       receiverUser,
+		"unreadMessages": unreadMessages,
+		"chat":           chat,
 	})
 }
