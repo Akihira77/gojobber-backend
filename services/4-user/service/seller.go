@@ -20,7 +20,7 @@ type SellerService struct {
 
 type SellerServiceImpl interface {
 	FindSellerByID(ctx context.Context, id string) (*types.SellerDTO, error)
-	FindSellerOverviewByID(ctx context.Context, id string) (*types.SellerOverview, error)
+	FindSellerOverviewByID(ctx context.Context, buyerId, sellerId string) (*types.SellerOverview, error)
 	FindSellerByBuyerID(ctx context.Context, buyerId string) (*types.Seller, error)
 	FindSellerByUsername(ctx context.Context, username string) (*types.SellerDTO, error)
 	GetRandomSellers(ctx context.Context, count int) ([]types.SellerDTO, error)
@@ -186,13 +186,13 @@ func (ss *SellerService) FindSellerByBuyerID(ctx context.Context, buyerId string
 	return &seller, result.Error
 }
 
-func (ss *SellerService) FindSellerOverviewByID(ctx context.Context, id string) (*types.SellerOverview, error) {
+func (ss *SellerService) FindSellerOverviewByID(ctx context.Context, buyerId, sellerId string) (*types.SellerOverview, error) {
 	var seller types.SellerOverview
 	result := ss.db.
 		Debug().
 		WithContext(ctx).
 		Model(&types.Seller{}).
-		First(&seller, "id = ?", id)
+		First(&seller, "id = ? OR buyer_id = ?", sellerId, buyerId)
 
 	return &seller, result.Error
 }

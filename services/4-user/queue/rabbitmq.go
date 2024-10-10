@@ -244,7 +244,7 @@ func (c *Connection) ConsumeFromGigService() {
 					ContentType:   "application/json",
 					ReplyTo:       msg.ReplyTo,
 				}
-				s, err := c.sellerSvc.FindSellerOverviewByID(ctx, val.SellerID)
+				s, err := c.sellerSvc.FindSellerOverviewByID(ctx, "", val.SellerID)
 				if err != nil {
 					b, _ := json.Marshal(&res)
 					r.Body = b

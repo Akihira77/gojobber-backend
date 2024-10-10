@@ -56,7 +56,7 @@ func (h *UserGRPCHandler) SaveBuyerData(ctx context.Context, req *user.SaveBuyer
 
 func (h *UserGRPCHandler) FindSeller(ctx context.Context, req *user.FindSellerRequest) (*user.FindSellerResponse, error) {
 	log.Println("FindSeller receive data", req)
-	seller, err := h.sellerSvc.FindSellerOverviewByID(ctx, req.SellerId)
+	seller, err := h.sellerSvc.FindSellerOverviewByID(ctx, req.BuyerId, req.SellerId)
 	if err != nil {
 		return nil, err
 	}
