@@ -10,30 +10,30 @@ import (
 	"gorm.io/gorm"
 )
 
-type orderStatus string
+type OrderStatus string
 
 const (
-	PENDING   orderStatus = "PENDING"
-	PROCESS   orderStatus = "PROCESS"
-	CANCELED  orderStatus = "CANCELED"
-	REFUNDED  orderStatus = "REFUNDED"
-	COMPLETED orderStatus = "COMPLETED"
+	PENDING   OrderStatus = "PENDING"
+	PROCESS   OrderStatus = "PROCESS"
+	CANCELED  OrderStatus = "CANCELED"
+	REFUNDED  OrderStatus = "REFUNDED"
+	COMPLETED OrderStatus = "COMPLETED"
 )
 
-var OrderStatuses = []string{
-	string(PENDING),
-	string(PROCESS),
-	string(CANCELED),
-	string(REFUNDED),
-	string(COMPLETED),
+var OrderStatuses = map[string]OrderStatus{
+	string(PENDING):   PENDING,
+	string(PROCESS):   PROCESS,
+	string(CANCELED):  CANCELED,
+	string(REFUNDED):  REFUNDED,
+	string(COMPLETED): COMPLETED,
 }
 
-func (p *orderStatus) Scan(value interface{}) error {
-	*p = orderStatus(value.([]byte))
+func (p *OrderStatus) Scan(value interface{}) error {
+	*p = OrderStatus(value.([]byte))
 	return nil
 }
 
-func (p orderStatus) Value() (driver.Value, error) {
+func (p OrderStatus) Value() (driver.Value, error) {
 	return string(p), nil
 }
 
@@ -70,7 +70,7 @@ type Order struct {
 	BuyerID            string             `json:"buyerId" gorm:"not null;"`
 	GigTitle           string             `json:"gigTitle" gorm:"not null;"`
 	GigDescription     string             `json:"gigDescription" gorm:"not null;"`
-	Status             orderStatus        `json:"status" gorm:"type:order_status;not null;"`
+	Status             OrderStatus        `json:"status" gorm:"type:order_status;not null;"`
 	Price              uint64             `json:"price" gorm:"not null;"`
 	ServiceFee         uint               `json:"serviceFee" gorm:"not null; default:0;"`
 	PaymentIntent      string             `json:"paymentIntent" gorm:"not null;"`
@@ -79,6 +79,21 @@ type Order struct {
 	InvoiceID          string             `json:"invoiceId,omitempty"`
 	StartDate          time.Time          `json:"startDate" gorm:"not null;"`
 	Deadline           time.Time          `json:"deadline" gorm:"not null;"`
+}
+
+type CreateOrderDTO struct {
+	SellerID        string `json:"sellerId" validate:"required"`
+	BuyerID         string `json:"buyerId" validate:"required"`
+	GigTitle        string `json:"gigTitle" validate:"required"`
+	GigDescription  string `json:"gigDescription" validate:"required"`
+	Price           uint64 `json:"price" validate:"required"`
+	ServiceFee      uint   `json:"serviceFee"`
+	PaymentIntentID string `json:"paymentIntentId"`
+	Deadline        int    `json:"deadline" validate:"required"`
+}
+
+type CreatePaymentIntentDTO struct {
+	Amount int64 `json:"amount"`
 }
 
 func ApplyDBSetup(db *gorm.DB) error {

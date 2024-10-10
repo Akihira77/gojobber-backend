@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"slices"
+	"math"
 	"time"
 
 	"github.com/Akihira77/gojobber/services/7-order/types"
+	"github.com/Akihira77/gojobber/services/7-order/util"
 	"gorm.io/gorm"
 )
 
@@ -18,10 +19,10 @@ type OrderServiceImpl interface {
 	FindOrderByID(ctx context.Context, id string) (*types.Order, error)
 	FindOrdersByBuyerID(ctx context.Context, id string) ([]types.Order, error)
 	FindOrdersBySellerID(ctx context.Context, id string) ([]types.Order, error)
-	CreateOrder(ctx context.Context) error
+	CreateOrder(ctx context.Context, data *types.CreateOrderDTO) (*types.Order, error)
 	CreatePaymentIntent(ctx context.Context) error
 	ChangeOrderStatus(ctx context.Context, o *types.Order, newStatus string) error
-	ExtendingDeadline(ctx context.Context, o *types.Order, addDays int) error
+	ExtendingDeadline(ctx context.Context, o *types.Order, numberOfDays int) error
 	DeliveringOrder(ctx context.Context, o *types.Order, dh *types.DeliveredHistory) error
 	FindMyOrderNotifications(ctx context.Context, sellerId string) error
 }
@@ -33,7 +34,7 @@ func NewOrderService(db *gorm.DB) OrderServiceImpl {
 }
 
 func (os *OrderService) ChangeOrderStatus(ctx context.Context, o *types.Order, newStatus string) error {
-	if !slices.Contains(types.OrderStatuses, newStatus) {
+	if _, ok := types.OrderStatuses[newStatus]; !ok {
 		return fmt.Errorf("Unknown order status")
 	}
 
@@ -51,9 +52,37 @@ func (os *OrderService) ChangeOrderStatus(ctx context.Context, o *types.Order, n
 	return result.Error
 }
 
-// TODO: ADD STRIPE FIRST
-func (os *OrderService) CreateOrder(ctx context.Context) error {
-	panic("unimplemented")
+func (os *OrderService) CreateOrder(ctx context.Context, data *types.CreateOrderDTO) (*types.Order, error) {
+	var orderEvents types.OrderEvents
+	orderEvents = append(orderEvents, types.OrderEvent{
+		Event:     "Buyer Has Purchased Your Gig",
+		CreatedAt: time.Now(),
+	})
+
+	startDate := time.Now()
+	newOrder := types.Order{
+		SellerID:           data.SellerID,
+		BuyerID:            data.BuyerID,
+		GigTitle:           data.GigTitle,
+		GigDescription:     data.GigDescription,
+		Price:              data.Price,
+		Status:             types.OrderStatuses[string(types.PENDING)],
+		ServiceFee:         uint(math.Ceil((25 / 100) * float64(data.Price))),
+		PaymentIntent:      data.PaymentIntentID,
+		StartDate:          startDate,
+		Deadline:           startDate.AddDate(0, 0, data.Deadline),
+		InvoiceID:          fmt.Sprint("JI%s", util.RandomStr(30)),
+		OrderEvents:        orderEvents,
+		DeliveredHistories: []types.DeliveredHistory{},
+	}
+
+	result := os.db.
+		Debug().
+		WithContext(ctx).
+		Model(&types.Order{}).
+		Create(&newOrder)
+
+	return &newOrder, result.Error
 }
 
 // TODO: ADD STRIPE FIRST
@@ -88,8 +117,8 @@ func (os *OrderService) DeliveringOrder(ctx context.Context, o *types.Order, dh 
 	return result.Error
 }
 
-func (os *OrderService) ExtendingDeadline(ctx context.Context, o *types.Order, addDays int) error {
-	o.Deadline = o.Deadline.Add(time.Duration(addDays))
+func (os *OrderService) ExtendingDeadline(ctx context.Context, o *types.Order, numberOfDays int) error {
+	o.Deadline = o.Deadline.Add(time.Duration(numberOfDays))
 	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
 		Event:     "Buyer Approved Seller Extending Date Request",
 		CreatedAt: time.Now(),

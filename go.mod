@@ -14,6 +14,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/stripe/stripe-go/v80 v80.2.0
 	golang.org/x/crypto v0.26.0
 	google.golang.org/grpc v1.67.0
 	google.golang.org/protobuf v1.34.2
