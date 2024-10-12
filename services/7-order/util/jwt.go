@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/Akihira77/gojobber/services/6-chat/types"
+	"github.com/Akihira77/gojobber/services/7-order/types"
 	"github.com/golang-jwt/jwt/v5"
 )
 

@@ -13,11 +13,12 @@ import (
 type OrderStatus string
 
 const (
-	PENDING   OrderStatus = "PENDING"
-	PROCESS   OrderStatus = "PROCESS"
-	CANCELED  OrderStatus = "CANCELED"
-	REFUNDED  OrderStatus = "REFUNDED"
-	COMPLETED OrderStatus = "COMPLETED"
+	REQUIRE_PAYMENT OrderStatus = "REQUIRE PAYMENT" //NOTE: BUYER HAS NOT PAID
+	PENDING         OrderStatus = "PENDING"         // BUYER HAS PAID, BUT SELLER HAS NOT SEE THE ORDER
+	PROCESS         OrderStatus = "PROCESS"         // BUYER HAS PAID AND SELLER DECIDE TO PROCESS THE ORDER
+	CANCELED        OrderStatus = "CANCELED"        // BUYER HAS PAID BUT SELLER CANCEL THE ORDER
+	REFUNDED        OrderStatus = "REFUNDED"        // BUYER HAS PAID BUT DECIDE TO REFUND THE ORDER
+	COMPLETED       OrderStatus = "COMPLETED"       // BUYER HAS PAID AND CONFIRM THAT THE ORDER IS COMPLETE
 )
 
 var OrderStatuses = map[string]OrderStatus{
@@ -73,7 +74,7 @@ type Order struct {
 	Status             OrderStatus        `json:"status" gorm:"type:order_status;not null;"`
 	Price              uint64             `json:"price" gorm:"not null;"`
 	ServiceFee         uint               `json:"serviceFee" gorm:"not null; default:0;"`
-	PaymentIntent      string             `json:"paymentIntent" gorm:"not null;"`
+	PaymentIntentID    string             `json:"paymentIntentId" gorm:"not null;"`
 	DeliveredHistories []DeliveredHistory `json:"deliveredHistories" gorm:"constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
 	OrderEvents        OrderEvents        `json:"orderEvents" gorm:"type:jsonb; serializer:json;"`
 	InvoiceID          string             `json:"invoiceId,omitempty"`
@@ -82,8 +83,9 @@ type Order struct {
 }
 
 type CreateOrderDTO struct {
+	ClientSecret    string `json:"clientSecret" validate:"required"`
 	SellerID        string `json:"sellerId" validate:"required"`
-	BuyerID         string `json:"buyerId" validate:"required"`
+	BuyerID         string `json:"buyerId"`
 	GigTitle        string `json:"gigTitle" validate:"required"`
 	GigDescription  string `json:"gigDescription" validate:"required"`
 	Price           uint64 `json:"price" validate:"required"`

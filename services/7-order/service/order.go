@@ -20,8 +20,8 @@ type OrderServiceImpl interface {
 	FindOrdersByBuyerID(ctx context.Context, id string) ([]types.Order, error)
 	FindOrdersBySellerID(ctx context.Context, id string) ([]types.Order, error)
 	CreateOrder(ctx context.Context, data *types.CreateOrderDTO) (*types.Order, error)
-	CreatePaymentIntent(ctx context.Context) error
-	ChangeOrderStatus(ctx context.Context, o *types.Order, newStatus string) error
+	RefundingOrder(ctx context.Context) error
+	ChangeOrderStatus(ctx context.Context, o *types.Order, newStatus types.OrderStatus) error
 	ExtendingDeadline(ctx context.Context, o *types.Order, numberOfDays int) error
 	DeliveringOrder(ctx context.Context, o *types.Order, dh *types.DeliveredHistory) error
 	FindMyOrderNotifications(ctx context.Context, sellerId string) error
@@ -33,12 +33,13 @@ func NewOrderService(db *gorm.DB) OrderServiceImpl {
 	}
 }
 
-func (os *OrderService) ChangeOrderStatus(ctx context.Context, o *types.Order, newStatus string) error {
-	if _, ok := types.OrderStatuses[newStatus]; !ok {
-		return fmt.Errorf("Unknown order status")
-	}
+// TODO: REFUNDING ORDER
+func (os *OrderService) RefundingOrder(ctx context.Context) error {
+	panic("unimplemented")
+}
 
-	o.Status = types.OrderStatus(newStatus)
+func (os *OrderService) ChangeOrderStatus(ctx context.Context, o *types.Order, newStatus types.OrderStatus) error {
+	o.Status = newStatus
 	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
 		Event:     fmt.Sprintf("Order Status Changed To [%s]", newStatus),
 		CreatedAt: time.Now(),
@@ -55,7 +56,7 @@ func (os *OrderService) ChangeOrderStatus(ctx context.Context, o *types.Order, n
 func (os *OrderService) CreateOrder(ctx context.Context, data *types.CreateOrderDTO) (*types.Order, error) {
 	var orderEvents types.OrderEvents
 	orderEvents = append(orderEvents, types.OrderEvent{
-		Event:     "Buyer Has Purchased Your Gig",
+		Event:     fmt.Sprintf("Buyer Has Purchased Your Gig With PaymentID: %s", data.PaymentIntentID),
 		CreatedAt: time.Now(),
 	})
 
@@ -68,10 +69,10 @@ func (os *OrderService) CreateOrder(ctx context.Context, data *types.CreateOrder
 		Price:              data.Price,
 		Status:             types.OrderStatuses[string(types.PENDING)],
 		ServiceFee:         uint(math.Ceil((25 / 100) * float64(data.Price))),
-		PaymentIntent:      data.PaymentIntentID,
+		PaymentIntentID:    data.PaymentIntentID,
 		StartDate:          startDate,
 		Deadline:           startDate.AddDate(0, 0, data.Deadline),
-		InvoiceID:          fmt.Sprint("JI%s", util.RandomStr(30)),
+		InvoiceID:          fmt.Sprintf("JI%s", util.RandomStr(30)),
 		OrderEvents:        orderEvents,
 		DeliveredHistories: []types.DeliveredHistory{},
 	}
@@ -83,11 +84,6 @@ func (os *OrderService) CreateOrder(ctx context.Context, data *types.CreateOrder
 		Create(&newOrder)
 
 	return &newOrder, result.Error
-}
-
-// TODO: ADD STRIPE FIRST
-func (os *OrderService) CreatePaymentIntent(ctx context.Context) error {
-	panic("unimplemented")
 }
 
 func (os *OrderService) DeliveringOrder(ctx context.Context, o *types.Order, dh *types.DeliveredHistory) error {

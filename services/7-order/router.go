@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Akihira77/gojobber/services/7-order/handler"
+	"github.com/Akihira77/gojobber/services/7-order/service"
 	"github.com/Akihira77/gojobber/services/7-order/types"
 	"github.com/Akihira77/gojobber/services/7-order/util"
 	"github.com/gofiber/fiber/v2"
@@ -16,27 +18,32 @@ import (
 )
 
 const (
-	BASE_PATH = "api/v1/order"
+	BASE_PATH = "api/v1/orders"
 )
 
 func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App) {
 	app.Get("health-check", func(c *fiber.Ctx) error {
-		return c.Status(http.StatusOK).SendString("Chat Service is healthy and OK.")
+		return c.Status(http.StatusOK).SendString("Order Service is healthy and OK.")
 	})
 
 	api := app.Group(BASE_PATH)
 	api.Use(verifyGatewayReq)
 	api.Use(authOnly)
 
-	api.Get("/:orderId", nil)
-	api.Get("/buyer/:buyerId", nil)
-	api.Get("/seller/:sellerId", nil)
-	api.Post("/create-payment-intent", nil)
-	api.Post("", nil)
-	api.Patch("/cancel/:orderId", nil)
-	api.Put("/gig/:type/:gigId", nil)
-	api.Patch("/extend-time/:orderId", nil)
-	api.Patch("/deliver-order/:orderId", nil)
+	os := service.NewOrderService(db)
+	oh := handler.NewOrderHttpHandler(os)
+
+	api.Get("/:id", oh.FindOrderByID)
+	api.Get("/buyer/my-orders", oh.FindOrdersByBuyerID)
+	api.Get("/seller/my-orders", oh.FindOrdersBySellerID)
+	api.Post("/payment-intents/create", oh.CreatePaymentIntent)
+	api.Post("/payment-intents/:paymentId/confirm", oh.ConfirmPayment)
+	api.Post("/payment-intents/:paymentId/refund", nil)
+	api.Post("/:orderId/complete", oh.OrderComplete)
+	api.Post("/:orderId/cancel", oh.CancelOrder)
+	api.Post("/seller/request-extending-deadline/:orderId", oh.RequestExtendingDeadline)
+	api.Post("/buyer/approve-extending-deadline/:orderId", oh.ExtendDeadline)
+	api.Patch("/seller/deliver-order/:orderId", nil)
 	api.Get("/notifications", nil)
 	api.Patch("/notification/mark-as-read", nil)
 
@@ -74,7 +81,7 @@ func authOnly(c *fiber.Ctx) error {
 	tokenStr := c.Cookies("token")
 	if tokenStr == "" {
 		authHeader := c.Get("Authorization")
-		if authHeader == "" || len(strings.Split(authHeader, " ")) == 0 {
+		if authHeader == "" || len(strings.Split(authHeader, " ")) <= 1 {
 			return fiber.NewError(http.StatusUnauthorized, "sign in first")
 		}
 		tokenStr = strings.Split(authHeader, " ")[1]
@@ -86,8 +93,9 @@ func authOnly(c *fiber.Ctx) error {
 	}
 
 	claims, ok := token.Claims.(*types.JWTClaims)
+	log.Println(claims)
 	if !ok {
-		log.Println("token is not matched with claims: claims", token.Claims)
+		log.Println("token is not matched with claims")
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 

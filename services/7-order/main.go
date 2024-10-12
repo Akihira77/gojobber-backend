@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+	"os"
 
+	"github.com/Akihira77/gojobber/services/7-order/handler"
 	"github.com/Akihira77/gojobber/services/7-order/util"
 	"github.com/joho/godotenv"
 )
@@ -14,11 +16,11 @@ func main() {
 	}
 
 	db, _ := NewStore()
-	// db.Migrator().DropTable(
+	// db.Debug().Migrator().DropTable(
 	// 	types.DeliveredHistory{},
 	// 	types.Order{},
 	// )
-	// db.AutoMigrate(
+	// db.Debug().AutoMigrate(
 	// 	types.DeliveredHistory{},
 	// 	types.Order{},
 	// )
@@ -29,5 +31,15 @@ func main() {
 
 	cld := util.NewCloudinary()
 
-	NewHttpServer(db, cld)
+	ccs := handler.NewGRPCClients()
+	ccs.AddClient("USER_SERVICE", os.Getenv("USER_GRPC_PORT"))
+	ccs.AddClient("NOTIFICATION_SERVICE", os.Getenv("NOTIFICATION_GRPC_PORT"))
+
+	go NewHttpServer(db, cld)
+
+	grpcServer := NewGRPCServer(os.Getenv("ORDER_GRPC_PORT"))
+	err = grpcServer.Run(db)
+	if err != nil {
+		log.Fatalf("Failed running GRPC Server %v", err)
+	}
 }
