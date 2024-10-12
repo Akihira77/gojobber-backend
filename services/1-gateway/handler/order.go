@@ -16,8 +16,8 @@ func NewOrderHandler(base_url string) *OrderHandler {
 	}
 }
 
-func (ah *OrderHandler) HealthCheck(c *fiber.Ctx) error {
-	route := ah.base_url + "/health-check"
+func (oh *OrderHandler) HealthCheck(c *fiber.Ctx) error {
+	route := oh.base_url + "/health-check"
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("Auth health check error", errs)
@@ -29,4 +29,30 @@ func (ah *OrderHandler) HealthCheck(c *fiber.Ctx) error {
 	return c.Status(statusCode).JSON(fiber.Map{
 		"response": string(body),
 	})
+}
+
+func (oh *OrderHandler) CreatePaymentIntent(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprint("/api/v1/order/payment-intent/create")
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Order Create Payment error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (oh *OrderHandler) ConfirmPayment(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/payment-intent/%s/confirm", c.Params("paymentId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Order Create Payment error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
 }

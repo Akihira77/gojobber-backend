@@ -62,3 +62,13 @@ func (h *NotificationGRPCHandler) SendEmailChatNotification(ctx context.Context,
 	}
 	return nil, err
 }
+
+func (h *NotificationGRPCHandler) SellerHasCompletedAnOrder(ctx context.Context, req *notification.SellerCompletedAnOrderRequest) (*emptypb.Empty, error) {
+	log.Println("Receiving data", req)
+	err := h.notificationSvc.SellerHasCompletedAnOrder(req.ReceiverEmail, req.BuyerEmail, req.OrderId, req.SellerCurrentBalance)
+
+	if err != nil {
+		log.Printf("SellerHasCompletedAnOrder for [%s] is error: %v", req.ReceiverEmail, err)
+	}
+	return nil, err
+}

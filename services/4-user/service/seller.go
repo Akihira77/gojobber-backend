@@ -26,6 +26,7 @@ type SellerServiceImpl interface {
 	GetRandomSellers(ctx context.Context, count int) ([]types.SellerDTO, error)
 	Create(ctx context.Context, sellerDataInBuyerDB *types.Buyer, data *types.CreateSellerDTO) (*types.SellerDTO, error)
 	Update(ctx context.Context, updatedSellerData *types.Seller, data *types.UpdateSellerDTO) error
+	UpdateBalance(ctx context.Context, sellerID string, addedBalance uint64) (*types.SellerIncBalanceDTO, error)
 }
 
 func NewSellerService(db *gorm.DB) SellerServiceImpl {
@@ -192,7 +193,15 @@ func (ss *SellerService) FindSellerOverviewByID(ctx context.Context, buyerId, se
 		Debug().
 		WithContext(ctx).
 		Model(&types.Seller{}).
-		First(&seller, "id = ? OR buyer_id = ?", sellerId, buyerId)
+		Select(`
+			sellers.full_name, 
+			buyers.email, 
+			sellers.ratings_count, 
+			sellers.rating_sum, 
+			sellers.rating_categories
+		`).
+		Joins("INNER JOIN buyers ON buyers.id = sellers.buyer_id").
+		First(&seller, "sellers.id = ? OR sellers.buyer_id = ?", sellerId, buyerId)
 
 	return &seller, result.Error
 }
@@ -502,6 +511,8 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 			Four:  0,
 			Five:  0,
 		},
+		StripeAccountID: data.StripeAccountID,
+		AccountBalance:  0,
 	}
 	result := tx.
 		Model(&types.Seller{}).
@@ -867,4 +878,40 @@ func (ss *SellerService) Update(ctx context.Context, updatedSellerData *types.Se
 	result = tx.Commit()
 
 	return result.Error
+}
+
+func (ss *SellerService) UpdateBalance(ctx context.Context, sellerID string, addedBalance uint64) (*types.SellerIncBalanceDTO, error) {
+	type Result struct {
+		Seller types.Seller
+		Email  string `json:"email" gorm:"email"`
+	}
+	var resultData Result
+
+	result := ss.db.
+		Debug().
+		WithContext(ctx).
+		Raw(`
+            UPDATE sellers
+            SET account_balance = account_balance + ?
+            FROM buyers
+            WHERE sellers.id = ? AND buyers.id = sellers.buyer_id
+            RETURNING sellers.*, buyers.email AS email
+        `, addedBalance, sellerID).
+		Scan(&resultData)
+
+	if resultData.Email == "" {
+		return nil, fmt.Errorf("Seller data is not found")
+	}
+
+	return &types.SellerIncBalanceDTO{
+		ID:               resultData.Seller.ID,
+		FullName:         resultData.Seller.FullName,
+		Email:            resultData.Email,
+		Bio:              resultData.Seller.Bio,
+		AccountBalance:   resultData.Seller.AccountBalance,
+		RatingSum:        resultData.Seller.RatingSum,
+		RatingsCount:     resultData.Seller.RatingsCount,
+		RatingCategories: resultData.Seller.RatingCategories,
+		StripeAccountID:  resultData.Seller.StripeAccountID,
+	}, result.Error
 }

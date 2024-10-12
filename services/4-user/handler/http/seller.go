@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 	"github.com/Akihira77/gojobber/services/4-user/types"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/stripe/stripe-go/v80"
+	"github.com/stripe/stripe-go/v80/account"
 	"gorm.io/gorm"
 )
 
@@ -20,6 +23,7 @@ type SellerHandler struct {
 	sellerSvc svc.SellerServiceImpl
 	buyerSvc  svc.BuyerServiceImpl
 	validate  *validator.Validate
+	stripeKey string
 }
 
 func NewSellerHandler(buyerSvc svc.BuyerServiceImpl, sellerSvc svc.SellerServiceImpl) *SellerHandler {
@@ -27,6 +31,7 @@ func NewSellerHandler(buyerSvc svc.BuyerServiceImpl, sellerSvc svc.SellerService
 		sellerSvc: sellerSvc,
 		buyerSvc:  buyerSvc,
 		validate:  validator.New(validator.WithRequiredStructEnabled()),
+		stripeKey: os.Getenv("STRIPE_SECRET_KEY"),
 	}
 }
 
@@ -135,6 +140,23 @@ func (sh *SellerHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusNotFound, "data does not found in buyer database")
 	}
 
+	acctParams := &stripe.AccountParams{
+		Country:      &sellerDataInBuyerDB.Country,
+		Email:        &sellerDataInBuyerDB.Email,
+		BusinessType: stripe.String(string(stripe.AccountBusinessTypeIndividual)),
+		Controller: &stripe.AccountControllerParams{
+			Fees: &stripe.AccountControllerFeesParams{
+				Payer: stripe.String(string(stripe.AccountControllerFeesPayerAccount)),
+			},
+		},
+	}
+	acc, err := account.New(acctParams)
+	if err != nil {
+		fmt.Printf("%+v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while creating seller account")
+	}
+
+	data.StripeAccountID = acc.ID
 	seller, err := sh.sellerSvc.Create(ctx, sellerDataInBuyerDB, data)
 	if err != nil {
 		fmt.Printf("%+v", err)

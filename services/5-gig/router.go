@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const BASE_PATH = "/api/v1/gig"
+const BASE_PATH = "/api/v1/gigs"
 
 func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App, ccs *handler.GRPCClients) {
 	app.Get("health-check", func(c *fiber.Ctx) error {

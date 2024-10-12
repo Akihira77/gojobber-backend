@@ -24,6 +24,7 @@ const (
 	NotificationService_UserForgotPassword_FullMethodName        = "/NotificationService/UserForgotPassword"
 	NotificationService_UserSucessResetPassword_FullMethodName   = "/NotificationService/UserSucessResetPassword"
 	NotificationService_SendEmailChatNotification_FullMethodName = "/NotificationService/SendEmailChatNotification"
+	NotificationService_SellerHasCompletedAnOrder_FullMethodName = "/NotificationService/SellerHasCompletedAnOrder"
 )
 
 // NotificationServiceClient is the client API for NotificationService service.
@@ -36,6 +37,8 @@ type NotificationServiceClient interface {
 	UserSucessResetPassword(ctx context.Context, in *SuccessResetPasswordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// From Chat Service
 	SendEmailChatNotification(ctx context.Context, in *EmailChatNotificationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// From Order Service
+	SellerHasCompletedAnOrder(ctx context.Context, in *SellerCompletedAnOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type notificationServiceClient struct {
@@ -86,6 +89,16 @@ func (c *notificationServiceClient) SendEmailChatNotification(ctx context.Contex
 	return out, nil
 }
 
+func (c *notificationServiceClient) SellerHasCompletedAnOrder(ctx context.Context, in *SellerCompletedAnOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, NotificationService_SellerHasCompletedAnOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NotificationServiceServer is the server API for NotificationService service.
 // All implementations must embed UnimplementedNotificationServiceServer
 // for forward compatibility.
@@ -96,6 +109,8 @@ type NotificationServiceServer interface {
 	UserSucessResetPassword(context.Context, *SuccessResetPasswordRequest) (*emptypb.Empty, error)
 	// From Chat Service
 	SendEmailChatNotification(context.Context, *EmailChatNotificationRequest) (*emptypb.Empty, error)
+	// From Order Service
+	SellerHasCompletedAnOrder(context.Context, *SellerCompletedAnOrderRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedNotificationServiceServer()
 }
 
@@ -117,6 +132,9 @@ func (UnimplementedNotificationServiceServer) UserSucessResetPassword(context.Co
 }
 func (UnimplementedNotificationServiceServer) SendEmailChatNotification(context.Context, *EmailChatNotificationRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendEmailChatNotification not implemented")
+}
+func (UnimplementedNotificationServiceServer) SellerHasCompletedAnOrder(context.Context, *SellerCompletedAnOrderRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SellerHasCompletedAnOrder not implemented")
 }
 func (UnimplementedNotificationServiceServer) mustEmbedUnimplementedNotificationServiceServer() {}
 func (UnimplementedNotificationServiceServer) testEmbeddedByValue()                             {}
@@ -211,6 +229,24 @@ func _NotificationService_SendEmailChatNotification_Handler(srv interface{}, ctx
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_SellerHasCompletedAnOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SellerCompletedAnOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).SellerHasCompletedAnOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_SellerHasCompletedAnOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).SellerHasCompletedAnOrder(ctx, req.(*SellerCompletedAnOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // NotificationService_ServiceDesc is the grpc.ServiceDesc for NotificationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -233,6 +269,10 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendEmailChatNotification",
 			Handler:    _NotificationService_SendEmailChatNotification_Handler,
+		},
+		{
+			MethodName: "SellerHasCompletedAnOrder",
+			Handler:    _NotificationService_SellerHasCompletedAnOrder_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

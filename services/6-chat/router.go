@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	BASE_PATH = "api/v1/chat"
+	BASE_PATH = "api/v1/chats"
 )
 
 func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App, grpcServices *handler.GRPCClients) {
@@ -70,7 +70,7 @@ func authOnly(c *fiber.Ctx) error {
 	tokenStr := c.Cookies("token")
 	if tokenStr == "" {
 		authHeader := c.Get("Authorization")
-		if authHeader == "" || len(strings.Split(authHeader, " ")) == 0 {
+		if authHeader == "" || len(strings.Split(authHeader, " ")) <= 1 {
 			return fiber.NewError(http.StatusUnauthorized, "sign in first")
 		}
 		tokenStr = strings.Split(authHeader, " ")[1]

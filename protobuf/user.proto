@@ -10,7 +10,8 @@ message SaveBuyerRequest {
     string country        = 4;
     string profilePicture = 5;
     bool isSeller       = 6;
-    google.protobuf.Timestamp createdAt      = 7;
+    string stripeAccountId = 7;
+    google.protobuf.Timestamp createdAt      = 8;
 }
 
 message SaveBuyerResponse {
@@ -26,9 +27,11 @@ message FindSellerRequest {
 message FindSellerResponse {
     string id = 1;
     string fullName         = 2;
-    int64 ratingsCount     = 3;
-    int64 ratingSum        = 4;
-    RatingCategory ratingCategories = 5;
+    string email = 3;
+    int64 ratingsCount     = 4;
+    int64 ratingSum        = 5;
+    string stripeAccountId = 6;
+    RatingCategory ratingCategories = 7;
 }
 
 message RatingCategory {
@@ -39,7 +42,25 @@ message RatingCategory {
     int32 one   = 5;
 }
 
+message UpdateSellerBalanceRequest {
+    string sellerId = 1;
+    uint64 amount = 2;
+}
+
+message UpdateSellerBalanceResponse {
+	string id = 1;
+    string bio = 2;
+    string fullName = 3;
+    string email = 4;
+    int64 ratingsCount = 5;
+    int64 ratingSum = 6;
+    RatingCategory ratingCategories = 7;
+	string stripeAccountID = 8;
+	uint64 accountBalance = 9;
+}
+
 service UserService {
     rpc SaveBuyerData(SaveBuyerRequest) returns (SaveBuyerResponse) {}
     rpc FindSeller(FindSellerRequest) returns (FindSellerResponse) {}
+    rpc UpdateSellerBalance(UpdateSellerBalanceRequest) returns (UpdateSellerBalanceResponse) {}
 }

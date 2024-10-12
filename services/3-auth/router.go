@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	BASE_PATH = "/api/v1/auth"
+	BASE_PATH = "/api/v1/auths"
 )
 
 func MainRouter(app *fiber.App, db *gorm.DB, cld *util.Cloudinary, ccs *handler.GRPCClients) {

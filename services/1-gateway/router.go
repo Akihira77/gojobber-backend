@@ -44,12 +44,12 @@ func MainRouter(app *fiber.App) {
 
 	handler.WsUpgrade(api)
 
-	authRouter(AUTH_URL, api.Group("/auth"))
-	userRouter(USER_URL, api.Group("/user"))
-	gigRouter(GIG_URL, api.Group("/gig"))
-	chatRouter(CHAT_URL, api.Group("/chat"))
-	orderRouter(ORDER_URL, api.Group("/order"))
-	reviewRouter(REVIEW_URL, api.Group("/review"))
+	authRouter(AUTH_URL, api.Group("/auths"))
+	userRouter(USER_URL, api.Group("/users"))
+	gigRouter(GIG_URL, api.Group("/gigs"))
+	chatRouter(CHAT_URL, api.Group("/chats"))
+	orderRouter(ORDER_URL, api.Group("/orders"))
+	reviewRouter(REVIEW_URL, api.Group("/reviews"))
 
 	app.All("*", func(c *fiber.Ctx) error {
 		return c.Status(http.StatusNotFound).SendString("Resource is not found")
@@ -123,6 +123,8 @@ func chatRouter(base_url string, r fiber.Router) {
 func orderRouter(base_url string, r fiber.Router) {
 	oh := handler.NewOrderHandler(base_url)
 	r.Get("/health-check", oh.HealthCheck)
+	r.Post("/payment-intent/create", oh.CreatePaymentIntent)
+	r.Post("/payment-intent/:paymentId/confirm", oh.ConfirmPayment)
 }
 
 func reviewRouter(base_url string, r fiber.Router) {

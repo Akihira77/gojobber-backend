@@ -61,10 +61,9 @@ func (h *UserGRPCHandler) FindSeller(ctx context.Context, req *user.FindSellerRe
 		return nil, err
 	}
 
-	log.Println(seller.FullName, seller.RatingsCount, seller.RatingSum)
-
 	return &user.FindSellerResponse{
 		FullName:     seller.FullName,
+		Email:        seller.Email,
 		RatingsCount: int64(seller.RatingsCount),
 		RatingSum:    int64(seller.RatingSum),
 		RatingCategories: &user.RatingCategory{
@@ -75,4 +74,31 @@ func (h *UserGRPCHandler) FindSeller(ctx context.Context, req *user.FindSellerRe
 			Five:  int32(seller.RatingCategories.Five),
 		},
 	}, nil
+}
+
+func (h *UserGRPCHandler) UpdateSellerBalance(ctx context.Context, req *user.UpdateSellerBalanceRequest) (*user.UpdateSellerBalanceResponse, error) {
+	log.Println("UpdateSellerBalance receive data", req)
+	seller, err := h.sellerSvc.UpdateBalance(ctx, req.SellerId, req.Amount)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user.UpdateSellerBalanceResponse{
+		Id:           seller.ID,
+		Bio:          seller.Bio,
+		FullName:     seller.FullName,
+		Email:        seller.Email,
+		RatingsCount: int64(seller.RatingsCount),
+		RatingSum:    int64(seller.RatingSum),
+		RatingCategories: &user.RatingCategory{
+			One:   int32(seller.RatingCategories.One),
+			Two:   int32(seller.RatingCategories.Two),
+			Three: int32(seller.RatingCategories.Three),
+			Four:  int32(seller.RatingCategories.Four),
+			Five:  int32(seller.RatingCategories.Five),
+		},
+		StripeAccountID: seller.StripeAccountID,
+		AccountBalance:  seller.AccountBalance,
+	}, nil
+
 }

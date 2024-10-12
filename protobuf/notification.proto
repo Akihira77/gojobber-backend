@@ -30,6 +30,14 @@ message EmailChatNotificationRequest {
     string message = 3;
 }
 
+//INFO: ORDER SERVICE
+message SellerCompletedAnOrderRequest {
+    string receiverEmail = 1;
+    string buyerEmail = 2;
+    string orderId = 3;
+    string sellerCurrentBalance = 4;
+}
+
 service NotificationService {
     // From Auth Service
     rpc UserVerifyingEmail(VerifyingEmailRequest) returns (google.protobuf.Empty) {}
@@ -39,4 +47,7 @@ service NotificationService {
 
     // From Chat Service
     rpc SendEmailChatNotification(EmailChatNotificationRequest) returns (google.protobuf.Empty) {}
+
+    // From Order Service
+    rpc SellerHasCompletedAnOrder(SellerCompletedAnOrderRequest) returns (google.protobuf.Empty) {}
 }

@@ -16,6 +16,7 @@ type NotificationServiceImpl interface {
 	UserForgotPassword(receiverEmail, htmlTemplateName, resetLink, username string) error
 	UserSucessResetPassword(receiverEmail, htmlTemplateName, username string) error
 	SendEmailChatNotification(receiverEmail, senderEmail, message string) error
+	SellerHasCompletedAnOrder(receiverEmail, buyerEmail, orderID, sellerCurrentBalance string) error
 }
 
 func NewNotificationService() NotificationServiceImpl {
@@ -75,6 +76,21 @@ func (ns *NotificationService) UserVerifyingEmail(receiverEmail string, htmlTemp
 	go func() {
 		defer wg.Done()
 		helper.VerifyAccountURLMail(errCh, receiverEmail, "Verify Account URL", verifyLink)
+	}()
+
+	wg.Wait()
+	close(errCh)
+	return <-errCh
+}
+
+func (ns *NotificationService) SellerHasCompletedAnOrder(receiverEmail, buyerEmail, orderID, sellerCurrentBalance string) error {
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		helper.SellerOrderHasCompleted(errCh, receiverEmail, fmt.Sprintf("Your Order [%s] Has Marked As Complete By Buyer %s", orderID, buyerEmail), buyerEmail, orderID, sellerCurrentBalance)
 	}()
 
 	wg.Wait()

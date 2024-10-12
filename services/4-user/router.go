@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	BASE_PATH = "/api/v1/user"
+	BASE_PATH = "/api/v1/users"
 )
 
 func MainRouter(db *gorm.DB, app *fiber.App) {
@@ -91,8 +91,9 @@ func authOnly(c *fiber.Ctx) error {
 	}
 
 	claims, ok := token.Claims.(*types.JWTClaims)
+	log.Println(claims)
 	if !ok {
-		log.Println("token is not matched with claims: claims", token.Claims)
+		log.Println("token is not matched with claims")
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 
