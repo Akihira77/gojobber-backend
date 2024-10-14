@@ -61,7 +61,7 @@ func (oh *OrderHttpHandler) FindOrderByID(c *fiber.Ctx) error {
 	})
 }
 
-func (oh *OrderHttpHandler) FindOrdersByBuyerID(c *fiber.Ctx) error {
+func (oh *OrderHttpHandler) FindMyOrdersAsBuyer(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 200*time.Millisecond)
 	defer cancel()
 
@@ -73,7 +73,7 @@ func (oh *OrderHttpHandler) FindOrdersByBuyerID(c *fiber.Ctx) error {
 
 	orders, err := oh.orderSvc.FindOrdersByBuyerID(ctx, userInfo.UserID)
 	if err != nil {
-		log.Printf("FindOrderByBuyerID error:\n+%v", err)
+		log.Printf("FindMyOrdersAsBuyer error:\n+%v", err)
 	}
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
@@ -82,7 +82,7 @@ func (oh *OrderHttpHandler) FindOrdersByBuyerID(c *fiber.Ctx) error {
 	})
 }
 
-func (oh *OrderHttpHandler) FindOrdersBySellerID(c *fiber.Ctx) error {
+func (oh *OrderHttpHandler) FindMyOrdersAsSeller(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 200*time.Millisecond)
 	defer cancel()
 
@@ -94,23 +94,23 @@ func (oh *OrderHttpHandler) FindOrdersBySellerID(c *fiber.Ctx) error {
 
 	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
-		log.Printf("FindOrdersBySellerID error:\n+%v", err)
+		log.Printf("FindMyOrdersAsSeller error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching orders")
 	}
 
-	sellerGrpcClient := user.NewUserServiceClient(cc)
-	sellerInfo, err := sellerGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
+	userGrpcClient := user.NewUserServiceClient(cc)
+	s, err := userGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
 		BuyerId:  userInfo.UserID,
 		SellerId: "",
 	})
 	if err != nil {
-		log.Printf("FindOrdersBySellerID error:\n+%v", err)
+		log.Printf("FindMyOrdersAsSeller error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching seller data")
 	}
 
-	orders, err := oh.orderSvc.FindOrdersBySellerID(ctx, sellerInfo.Id)
+	orders, err := oh.orderSvc.FindOrdersBySellerID(ctx, s.Id)
 	if err != nil {
-		log.Printf("FindOrdersBySellerID error:\n+%v", err)
+		log.Printf("FindMyOrdersAsSeller error:\n+%v", err)
 	}
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
@@ -150,8 +150,8 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while validating gig")
 	}
 
-	sellerGrpcClient := user.NewUserServiceClient(cc)
-	sellerInfo, err := sellerGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
+	userGrpcClient := user.NewUserServiceClient(cc)
+	s, err := userGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
 		BuyerId:  "",
 		SellerId: data.SellerID,
 	})
@@ -163,7 +163,7 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 			Enabled: stripe.Bool(true),
 		},
 		ReceiptEmail: &userInfo.Email,
-		OnBehalfOf:   stripe.String(sellerInfo.StripeAccountId),
+		OnBehalfOf:   stripe.String(s.StripeAccountId),
 		Metadata: map[string]string{
 			"buyer_id":  data.BuyerID,
 			"seller_id": data.SellerID,
@@ -190,20 +190,20 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 
 // NOTE: TEST FIRST TO DETERMINE IF IT NEEDS TO USING GOROUTINE
 func (oh *OrderHttpHandler) HandleStripeWebhook(c *fiber.Ctx) error {
-	endpointSecret := os.Getenv("STRIPE_ENDPOINT_SECRET")
-	event, err := webhook.ConstructEvent(c.Body(), c.Get("Stripe-Signature"), endpointSecret)
+	es := os.Getenv("STRIPE_ENDPOINT_SECRET")
+	e, err := webhook.ConstructEvent(c.Body(), c.Get("Stripe-Signature"), es)
 	if err != nil {
 		log.Printf("Error verifying webhook signature: %v", err)
 		return fiber.NewError(fiber.StatusInternalServerError, "Unexpected error happened. Please try again.")
 	}
 
-	switch event.Type {
+	switch e.Type {
 	case stripe.EventTypePaymentIntentSucceeded:
 		ctx, cancel := context.WithTimeout(c.UserContext(), 200*time.Millisecond)
 		defer cancel()
 
 		var pi stripe.PaymentIntent
-		err := json.Unmarshal(event.Data.Raw, &pi)
+		err := json.Unmarshal(e.Data.Raw, &pi)
 		if err != nil {
 			log.Printf("Error parsing webhook JSON: %v", err)
 			return fiber.NewError(fiber.StatusInternalServerError, "Unexpected error happened. Please try again.")
@@ -254,7 +254,7 @@ func (oh *OrderHttpHandler) BuyerMarkOrderAsComplete(c *fiber.Ctx) error {
 	}
 
 	userGrpcClient := user.NewUserServiceClient(cc)
-	sellerInfo, err := userGrpcClient.UpdateSellerBalance(ctx, &user.UpdateSellerBalanceRequest{
+	s, err := userGrpcClient.UpdateSellerBalance(ctx, &user.UpdateSellerBalanceRequest{
 		SellerId: o.SellerID,
 		Amount:   o.Price,
 	})
@@ -273,10 +273,10 @@ func (oh *OrderHttpHandler) BuyerMarkOrderAsComplete(c *fiber.Ctx) error {
 
 		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
 		_, err = notificationGrpcClient.SellerHasCompletedAnOrder(context.TODO(), &notification.SellerCompletedAnOrderRequest{
-			ReceiverEmail:        sellerInfo.Email,
+			ReceiverEmail:        s.Email,
 			BuyerEmail:           userInfo.Email,
 			OrderId:              o.ID,
-			SellerCurrentBalance: strconv.FormatUint(sellerInfo.AccountBalance, 10),
+			SellerCurrentBalance: strconv.FormatUint(s.AccountBalance, 10),
 		})
 		if err != nil {
 			log.Printf("OrderComplete error:\n+%v", err)
@@ -321,7 +321,6 @@ func (oh *OrderHttpHandler) SellerCancellingOrder(c *fiber.Ctx) error {
 	return c.SendStatus(http.StatusOK)
 }
 
-// TODO: IMPLEMENT
 func (oh *OrderHttpHandler) RequestDeadlineExtension(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
 	defer cancel()
@@ -386,23 +385,35 @@ func (oh *OrderHttpHandler) RequestDeadlineExtension(c *fiber.Ctx) error {
 	return c.SendStatus(http.StatusOK)
 }
 
-// TODO: IMPLEMENT
 func (oh *OrderHttpHandler) ApproveDeadlineExtension(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
 	defer cancel()
 
+	data := new(types.DeadlineExtensionRequest)
+	err := c.BodyParser(data)
+	if err != nil {
+		log.Printf("ApproveDeadlineExtension error:\n+%v", err)
+		return fiber.NewError(http.StatusBadRequest, "invalid data")
+	}
+
+	err = oh.validate.Struct(data)
+	if err != nil {
+		log.Printf("ApproveDeadlineExtension error:\n+%v", err)
+		return fiber.NewError(http.StatusBadRequest, "invalid data")
+	}
+
 	o, err := oh.orderSvc.FindOrderByID(ctx, c.Params("orderId"))
 	if err != nil {
-		log.Printf("RequestExtendingDeadline error:\n+%v", err)
+		log.Printf("ApproveDeadlineExtension error:\n+%v", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fiber.NewError(http.StatusNotFound, "Order is not found")
 		}
 		return fiber.NewError(http.StatusInternalServerError, "Error while finding order")
 	}
 
-	err = oh.orderSvc.ApproveDeadlineExtension(ctx, *o, data)
+	err = oh.orderSvc.ApproveDeadlineExtension(ctx, *o, data.NumberOfDays)
 	if err != nil {
-		log.Printf("RequestExtendingDeadline error:\n+%v", err)
+		log.Printf("ApproveDeadlineExtension error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
 	}
 
