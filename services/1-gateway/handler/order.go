@@ -56,3 +56,29 @@ func (oh *OrderHandler) HandleStripeWebhook(c *fiber.Ctx) error {
 
 	return c.Status(statusCode).Send(body)
 }
+
+func (oh *OrderHandler) RequestDeadlineExtension(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/deadline/extension/%s/request", c.Params("orderId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Request Deadline Extension Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (oh *OrderHandler) BuyerDeadlineExtensionResponse(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/deadline/extension/%s/response", c.Params("orderId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Deadline Extension Response Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}

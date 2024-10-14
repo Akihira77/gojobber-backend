@@ -21,10 +21,9 @@ type OrderServiceImpl interface {
 	FindOrdersByBuyerID(ctx context.Context, id string) ([]types.Order, error)
 	FindOrdersBySellerID(ctx context.Context, id string) ([]types.Order, error)
 	SaveOrder(ctx context.Context, data *types.CreateOrderDTO) (*types.Order, error)
-	RefundingOrder(ctx context.Context) error
-	ChangeOrderStatus(ctx context.Context, o types.Order, newStatus types.OrderStatus) error
-	ApproveDeadlineExtension(ctx context.Context, o types.Order, numberOfDays int) error
+	ChangeOrderStatus(ctx context.Context, o types.Order, newStatus types.OrderStatus, reason string) (*types.Order, error)
 	RequestDeadlineExtension(ctx context.Context, o types.Order, data *types.DeadlineExtensionRequest) error
+	DeadlineExtensionResponse(ctx context.Context, o types.Order, extensionResponse string, data *types.DeadlineExtensionRequest) (string, error)
 	DeliveringOrder(ctx context.Context, o types.Order, dh types.DeliveredHistory) error
 	FindMyOrderNotifications(ctx context.Context, sellerId string) error
 }
@@ -35,15 +34,10 @@ func NewOrderService(db *gorm.DB) OrderServiceImpl {
 	}
 }
 
-// TODO: REFUNDING ORDER
-func (os *OrderService) RefundingOrder(ctx context.Context) error {
-	panic("unimplemented")
-}
-
-func (os *OrderService) ChangeOrderStatus(ctx context.Context, o types.Order, newStatus types.OrderStatus) error {
+func (os *OrderService) ChangeOrderStatus(ctx context.Context, o types.Order, newStatus types.OrderStatus, reason string) (*types.Order, error) {
 	o.Status = newStatus
 	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
-		Event:     fmt.Sprintf("Order Status Changed To [%s]", newStatus),
+		Event:     reason,
 		CreatedAt: time.Now(),
 	})
 
@@ -52,7 +46,7 @@ func (os *OrderService) ChangeOrderStatus(ctx context.Context, o types.Order, ne
 		WithContext(ctx).
 		Save(&o)
 
-	return result.Error
+	return &o, result.Error
 }
 
 func (os *OrderService) SaveOrder(ctx context.Context, data *types.CreateOrderDTO) (*types.Order, error) {
@@ -131,19 +125,38 @@ func (os *OrderService) RequestDeadlineExtension(ctx context.Context, o types.Or
 	return result.Error
 }
 
-func (os *OrderService) ApproveDeadlineExtension(ctx context.Context, o types.Order, numberOfDays int) error {
-	o.Deadline = o.Deadline.Add(time.Duration(numberOfDays))
-	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
-		Event:     "Buyer Approved Seller Order Deadline Extension",
-		CreatedAt: time.Now(),
-	})
+func (os *OrderService) DeadlineExtensionResponse(ctx context.Context, o types.Order, extensionResponse string, data *types.DeadlineExtensionRequest) (string, error) {
+	switch extensionResponse {
+	case "APPROVED":
+		msg := fmt.Sprintf("Buyer Approved Seller Order Deadline Extension From [%v] To [%v]", o.Deadline, o.Deadline.Add(time.Duration(data.NumberOfDays)))
+		o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
+			Event:     msg,
+			CreatedAt: time.Now(),
+		})
+		o.Deadline = o.Deadline.Add(time.Duration(data.NumberOfDays))
 
-	result := os.db.
-		Debug().
-		WithContext(ctx).
-		Save(&o)
+		result := os.db.
+			Debug().
+			WithContext(ctx).
+			Save(&o)
 
-	return result.Error
+		return msg, result.Error
+	case "DISAPPROVED":
+		msg := fmt.Sprintf("Buyer Disapproved Your Order Deadline Extension With Reason:\n%s", data.Reason)
+		o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
+			Event:     msg,
+			CreatedAt: time.Now(),
+		})
+
+		result := os.db.
+			Debug().
+			WithContext(ctx).
+			Save(&o)
+
+		return msg, result.Error
+	default:
+		return "", fmt.Errorf("Unknown deadline extension response")
+	}
 }
 
 func (os *OrderService) FindMyOrderNotifications(ctx context.Context, sellerId string) error {

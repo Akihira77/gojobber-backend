@@ -26,6 +26,9 @@ const (
 	NotificationService_SendEmailChatNotification_FullMethodName      = "/NotificationService/SendEmailChatNotification"
 	NotificationService_SellerHasCompletedAnOrder_FullMethodName      = "/NotificationService/SellerHasCompletedAnOrder"
 	NotificationService_SellerRequestDeadlineExtension_FullMethodName = "/NotificationService/SellerRequestDeadlineExtension"
+	NotificationService_SellerCanceledAnOrder_FullMethodName          = "/NotificationService/SellerCanceledAnOrder"
+	NotificationService_BuyerDeadlineExtensionResponse_FullMethodName = "/NotificationService/BuyerDeadlineExtensionResponse"
+	NotificationService_BuyerRefundsAnOrder_FullMethodName            = "/NotificationService/BuyerRefundsAnOrder"
 )
 
 // NotificationServiceClient is the client API for NotificationService service.
@@ -41,6 +44,9 @@ type NotificationServiceClient interface {
 	// From Order Service
 	SellerHasCompletedAnOrder(ctx context.Context, in *SellerCompletedAnOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SellerRequestDeadlineExtension(ctx context.Context, in *SellerDeadlineExtensionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SellerCanceledAnOrder(ctx context.Context, in *SellerCancelOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	BuyerDeadlineExtensionResponse(ctx context.Context, in *BuyerDeadlineExtension, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	BuyerRefundsAnOrder(ctx context.Context, in *BuyerRefundsOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type notificationServiceClient struct {
@@ -111,6 +117,36 @@ func (c *notificationServiceClient) SellerRequestDeadlineExtension(ctx context.C
 	return out, nil
 }
 
+func (c *notificationServiceClient) SellerCanceledAnOrder(ctx context.Context, in *SellerCancelOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, NotificationService_SellerCanceledAnOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) BuyerDeadlineExtensionResponse(ctx context.Context, in *BuyerDeadlineExtension, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, NotificationService_BuyerDeadlineExtensionResponse_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) BuyerRefundsAnOrder(ctx context.Context, in *BuyerRefundsOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, NotificationService_BuyerRefundsAnOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NotificationServiceServer is the server API for NotificationService service.
 // All implementations must embed UnimplementedNotificationServiceServer
 // for forward compatibility.
@@ -124,6 +160,9 @@ type NotificationServiceServer interface {
 	// From Order Service
 	SellerHasCompletedAnOrder(context.Context, *SellerCompletedAnOrderRequest) (*emptypb.Empty, error)
 	SellerRequestDeadlineExtension(context.Context, *SellerDeadlineExtensionRequest) (*emptypb.Empty, error)
+	SellerCanceledAnOrder(context.Context, *SellerCancelOrderRequest) (*emptypb.Empty, error)
+	BuyerDeadlineExtensionResponse(context.Context, *BuyerDeadlineExtension) (*emptypb.Empty, error)
+	BuyerRefundsAnOrder(context.Context, *BuyerRefundsOrderRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedNotificationServiceServer()
 }
 
@@ -151,6 +190,15 @@ func (UnimplementedNotificationServiceServer) SellerHasCompletedAnOrder(context.
 }
 func (UnimplementedNotificationServiceServer) SellerRequestDeadlineExtension(context.Context, *SellerDeadlineExtensionRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SellerRequestDeadlineExtension not implemented")
+}
+func (UnimplementedNotificationServiceServer) SellerCanceledAnOrder(context.Context, *SellerCancelOrderRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SellerCanceledAnOrder not implemented")
+}
+func (UnimplementedNotificationServiceServer) BuyerDeadlineExtensionResponse(context.Context, *BuyerDeadlineExtension) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BuyerDeadlineExtensionResponse not implemented")
+}
+func (UnimplementedNotificationServiceServer) BuyerRefundsAnOrder(context.Context, *BuyerRefundsOrderRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BuyerRefundsAnOrder not implemented")
 }
 func (UnimplementedNotificationServiceServer) mustEmbedUnimplementedNotificationServiceServer() {}
 func (UnimplementedNotificationServiceServer) testEmbeddedByValue()                             {}
@@ -281,6 +329,60 @@ func _NotificationService_SellerRequestDeadlineExtension_Handler(srv interface{}
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_SellerCanceledAnOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SellerCancelOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).SellerCanceledAnOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_SellerCanceledAnOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).SellerCanceledAnOrder(ctx, req.(*SellerCancelOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_BuyerDeadlineExtensionResponse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BuyerDeadlineExtension)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).BuyerDeadlineExtensionResponse(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_BuyerDeadlineExtensionResponse_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).BuyerDeadlineExtensionResponse(ctx, req.(*BuyerDeadlineExtension))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_BuyerRefundsAnOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BuyerRefundsOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).BuyerRefundsAnOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_BuyerRefundsAnOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).BuyerRefundsAnOrder(ctx, req.(*BuyerRefundsOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // NotificationService_ServiceDesc is the grpc.ServiceDesc for NotificationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -311,6 +413,18 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SellerRequestDeadlineExtension",
 			Handler:    _NotificationService_SellerRequestDeadlineExtension_Handler,
+		},
+		{
+			MethodName: "SellerCanceledAnOrder",
+			Handler:    _NotificationService_SellerCanceledAnOrder_Handler,
+		},
+		{
+			MethodName: "BuyerDeadlineExtensionResponse",
+			Handler:    _NotificationService_BuyerDeadlineExtensionResponse_Handler,
+		},
+		{
+			MethodName: "BuyerRefundsAnOrder",
+			Handler:    _NotificationService_BuyerRefundsAnOrder_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

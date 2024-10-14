@@ -180,7 +180,7 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 		}
 
 		filePath := util.RandomStr(64)
-		//NOTE: IDK IF IT IS CORRECT HEADER
+		//FIX: IDK IF IT IS CORRECT HEADER
 		uploadResult, err := ch.cld.UploadFile(ctx, formHeader, data.File, filePath, formHeader.Header.Get("file-type"))
 		if err != nil {
 			fmt.Printf("InsertMessage Error:\n+%v", err)

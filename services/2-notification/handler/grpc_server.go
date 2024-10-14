@@ -72,3 +72,33 @@ func (h *NotificationGRPCHandler) SellerHasCompletedAnOrder(ctx context.Context,
 	}
 	return nil, err
 }
+
+func (h *NotificationGRPCHandler) BuyerDeadlineExtensionResponse(ctx context.Context, req *notification.BuyerDeadlineExtension) (*emptypb.Empty, error) {
+	log.Println("Receiving data", req)
+	err := h.notificationSvc.BuyerDeadlineExtensionResponse(req.ReceiverEmail, req.Message)
+
+	if err != nil {
+		log.Printf("BuyerDeadlineExtensionResponse for [%s] is error: %v", req.ReceiverEmail, err)
+	}
+	return nil, err
+}
+
+func (h *NotificationGRPCHandler) BuyerRefundsAnOrder(ctx context.Context, req *notification.BuyerRefundsOrderRequest) (*emptypb.Empty, error) {
+	log.Println("Receiving data", req)
+	err := h.notificationSvc.BuyerRefundsAnOrder(req.ReceiverEmail, req.Reason)
+
+	if err != nil {
+		log.Printf("BuyerRefundsAnOrder for [%s] is error: %v", req.ReceiverEmail, err)
+	}
+	return nil, err
+}
+
+func (h *NotificationGRPCHandler) SellerCanceledAnOrder(ctx context.Context, req *notification.SellerCancelOrderRequest) (*emptypb.Empty, error) {
+	log.Println("Receiving data", req)
+	err := h.notificationSvc.SellerCanceledAnOrder(req.ReceiverEmail, req.Reason)
+
+	if err != nil {
+		log.Printf("SellerCanceledAnOrder for [%s] is error: %v", req.ReceiverEmail, err)
+	}
+	return nil, err
+}

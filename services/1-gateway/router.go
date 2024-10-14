@@ -60,7 +60,6 @@ func authRouter(base_url string, r fiber.Router) {
 	ah := handler.NewAuthHandler(base_url)
 	r.Get("/health-check", ah.HealthCheck)
 
-	//INFO: AUTH ROUTER
 	r.Get("/user-info", ah.GetUserInfo)
 	r.Get("/refresh-token/:username", ah.RefreshToken)
 	r.Post("/signin", ah.SignIn)
@@ -76,11 +75,9 @@ func userRouter(base_url string, r fiber.Router) {
 	uh := handler.NewUserHandler(base_url)
 	r.Get("/health-check", uh.HealthCheck)
 
-	//INFO: BUYER ROUTER
 	r.Get("/buyer/my-info", uh.GetMyBuyerInfo)
 	r.Get("/buyer/:username", uh.FindBuyerByUsername)
 
-	//INFO: SELLER ROUTER
 	r.Get("/seller/my-info", uh.GetMySellerInfo)
 	r.Get("/seller/id/:id", uh.FindSellerByID)
 	r.Get("/seller/username/:username", uh.FindSellerByUsername)
@@ -94,7 +91,6 @@ func gigRouter(base_url string, r fiber.Router) {
 	gh := handler.NewGigHandler(base_url)
 	r.Get("/health-check", gh.HealthCheck)
 
-	//INFO: GIG ROUTE
 	r.Get("/id/:id", gh.FindGigByID)
 	r.Get("/seller/:sellerId/:page/:size", gh.FindSellerActiveGigs)
 	r.Get("/seller/inactive/:sellerId/:page/:size", gh.FindSellerInactiveGigs)
@@ -112,7 +108,6 @@ func chatRouter(base_url string, r fiber.Router) {
 	ch := handler.NewChatHandler(base_url)
 	r.Get("/health-check", ch.HealthCheck)
 
-	//INFO: CHAT ROUTER
 	// r.Get("/my-notifications", ch.GetAllMyConversations)
 	r.Get("/my-conversations", ch.GetAllMyConversations)
 	r.Get("/id/:conversationId", ch.GetMessagesInsideConversation)
@@ -129,10 +124,10 @@ func orderRouter(base_url string, r fiber.Router) {
 	r.Post("/stripe-webhook", oh.HandleStripeWebhook)
 	r.Post("/payment-intents/create", oh.CreatePaymentIntent)
 	r.Post("/payment-intents/:paymentId/refund", nil)
+	r.Post("/deadline/extension/:orderId/request", oh.RequestDeadlineExtension)
+	r.Post("/deadline/extension/:orderId/response", oh.BuyerDeadlineExtensionResponse)
 	// r.Post("/:orderId/complete", oh.OrderComplete)
 	// r.Post("/:orderId/cancel", oh.CancelOrder)
-	// r.Post("/seller/request-deadline-extension/:orderId", oh.RequestExtendingDeadline)
-	// r.Post("/buyer/approve-deadline-extension/:orderId", oh.ExtendDeadline)
 	// r.Post("/seller/deliver-order/:orderId", nil)
 }
 

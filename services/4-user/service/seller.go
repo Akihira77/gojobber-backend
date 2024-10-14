@@ -379,7 +379,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 		goRoutineSize := 5
 		errCh := make(chan error, goRoutineSize)
 
-		//NOTE: 1. GRAB SELLER LANGUAGES
+		//INFO: 1. GRAB SELLER LANGUAGES
 		wg.Add(1)
 		var sellerLanguages []types.Language
 		go func() {
@@ -396,7 +396,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		//NOTE: 2. GRAB SELLER SKILLS
+		//INFO: 2. GRAB SELLER SKILLS
 		wg.Add(1)
 		var sellerSkills []types.Skill
 		go func() {
@@ -413,7 +413,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		//NOTE: 3. GRAB SELLER EDUCATIONS
+		//INFO: 3. GRAB SELLER EDUCATIONS
 		wg.Add(1)
 		var sellerEducations []types.EducationDTO
 		go func() {
@@ -428,7 +428,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		//NOTE: 4. GRAB SELLER CERTIFICATES
+		//INFO: 4. GRAB SELLER CERTIFICATES
 		wg.Add(1)
 		var sellerCertificates []types.CertificateDTO
 		go func() {
@@ -443,7 +443,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		//NOTE: 5. GRAB SELLER EXPERIENCES
+		//INFO: 5. GRAB SELLER EXPERIENCES
 		wg.Add(1)
 		var sellerExperiences []types.ExperienceDTO
 		go func() {
@@ -526,7 +526,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 	var educations []types.EducationDTO
 	var certificates []types.CertificateDTO
 
-	//NOTE: 1. SAVE LANGUAGES
+	//INFO: 1. SAVE LANGUAGES
 	for _, lang := range data.Languages {
 		result = tx.
 			Model(&types.Language{}).
@@ -551,7 +551,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 		}
 	}
 
-	//NOTE: 2. SAVE SKILLS
+	//INFO: 2. SAVE SKILLS
 	for _, skill := range data.Skills {
 		result = tx.
 			Model(&types.Skill{}).
@@ -572,7 +572,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 		}
 	}
 
-	//NOTE: 3. SAVE EDUCATIONS
+	//INFO: 3. SAVE EDUCATIONS
 	for _, education := range data.Educations {
 		edu := types.Education{
 			Title:      education.Title,
@@ -598,7 +598,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 		})
 	}
 
-	//NOTE: 4. SAVE CERTIFICATES
+	//INFO: 4. SAVE CERTIFICATES
 	for _, certif := range data.Certificates {
 		cert := types.Certificate{
 			Name:     certif.Name,
@@ -622,7 +622,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 		})
 	}
 
-	//NOTE: 5. SAVE EXPERIENCES
+	//INFO: 5. SAVE EXPERIENCES
 	for _, experience := range data.Experiences {
 		exp := types.Experience{
 			Title:                experience.Title,

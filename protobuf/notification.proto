@@ -40,7 +40,22 @@ message SellerCompletedAnOrderRequest {
 
 message SellerDeadlineExtensionRequest {
     string receiverEmail = 1;
+    string reason = 2;
+}
+
+message SellerCancelOrderRequest {
+    string receiverEmail = 1;
+    string reason = 2;
+}
+
+message BuyerDeadlineExtension {
+    string receiverEmail = 1;
     string message = 2;
+}
+
+message BuyerRefundsOrderRequest {
+    string receiverEmail = 1;
+    string reason = 2;
 }
 
 service NotificationService {
@@ -56,4 +71,7 @@ service NotificationService {
     // From Order Service
     rpc SellerHasCompletedAnOrder(SellerCompletedAnOrderRequest) returns (google.protobuf.Empty) {}
     rpc SellerRequestDeadlineExtension(SellerDeadlineExtensionRequest) returns (google.protobuf.Empty) {}
+    rpc SellerCanceledAnOrder(SellerCancelOrderRequest) returns (google.protobuf.Empty) {}
+    rpc BuyerDeadlineExtensionResponse(BuyerDeadlineExtension) returns (google.protobuf.Empty) {}
+    rpc BuyerRefundsAnOrder(BuyerRefundsOrderRequest) returns (google.protobuf.Empty) {}
 }

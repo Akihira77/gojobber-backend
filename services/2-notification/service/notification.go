@@ -17,12 +17,62 @@ type NotificationServiceImpl interface {
 	UserSucessResetPassword(receiverEmail, htmlTemplateName, username string) error
 	SendEmailChatNotification(receiverEmail, senderEmail, message string) error
 	SellerHasCompletedAnOrder(receiverEmail, buyerEmail, orderID, sellerCurrentBalance string) error
+	BuyerDeadlineExtensionResponse(receiverEmail, message string) error
+	BuyerRefundsAnOrder(receiverEmail, reason string) error
+	SellerCanceledAnOrder(receiverEmail, reason string) error
 }
 
 func NewNotificationService() NotificationServiceImpl {
 	return &NotificationService{
 		errCh: make(chan error, 1),
 	}
+}
+
+func (ns *NotificationService) SellerCanceledAnOrder(receiverEmail string, reason string) error {
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		errCh <- helper.SendMail(receiverEmail, fmt.Sprintf("Seller Has Canceled Your Order"), reason)
+	}()
+
+	wg.Wait()
+	close(errCh)
+	return <-errCh
+}
+
+// TODO: REFACTORE
+func (ns *NotificationService) BuyerDeadlineExtensionResponse(receiverEmail string, message string) error {
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		errCh <- helper.SendMail(receiverEmail, fmt.Sprintf("Buyer Response Your Deadline Extension"), message)
+	}()
+
+	wg.Wait()
+	close(errCh)
+	return <-errCh
+}
+
+// TODO: REFACTORE
+func (ns *NotificationService) BuyerRefundsAnOrder(receiverEmail string, reason string) error {
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		errCh <- helper.SendMail(receiverEmail, fmt.Sprintf("Buyer Refunds The Order"), reason)
+	}()
+
+	wg.Wait()
+	close(errCh)
+	return <-errCh
 }
 
 func (ns *NotificationService) SendEmailChatNotification(receiverEmail string, senderEmail string, message string) error {
