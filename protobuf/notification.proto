@@ -38,6 +38,11 @@ message SellerCompletedAnOrderRequest {
     string sellerCurrentBalance = 4;
 }
 
+message SellerDeadlineExtensionRequest {
+    string receiverEmail = 1;
+    string message = 2;
+}
+
 service NotificationService {
     // From Auth Service
     rpc UserVerifyingEmail(VerifyingEmailRequest) returns (google.protobuf.Empty) {}
@@ -50,4 +55,5 @@ service NotificationService {
 
     // From Order Service
     rpc SellerHasCompletedAnOrder(SellerCompletedAnOrderRequest) returns (google.protobuf.Empty) {}
+    rpc SellerRequestDeadlineExtension(SellerDeadlineExtensionRequest) returns (google.protobuf.Empty) {}
 }

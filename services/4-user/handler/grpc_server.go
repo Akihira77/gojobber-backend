@@ -54,24 +54,40 @@ func (h *UserGRPCHandler) SaveBuyerData(ctx context.Context, req *user.SaveBuyer
 	return res, nil
 }
 
+func (h *UserGRPCHandler) FindBuyer(ctx context.Context, req *user.FindBuyerRequest) (*user.FindBuyerResponse, error) {
+	log.Println("FindSeller receive data", req)
+	b, err := h.buyerSvc.FindBuyerByID(ctx, req.BuyerId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user.FindBuyerResponse{
+		Id:             b.ID,
+		Username:       b.Username,
+		Email:          b.Email,
+		Country:        b.Country,
+		ProfilePicture: b.ProfilePicture,
+	}, nil
+}
+
 func (h *UserGRPCHandler) FindSeller(ctx context.Context, req *user.FindSellerRequest) (*user.FindSellerResponse, error) {
 	log.Println("FindSeller receive data", req)
-	seller, err := h.sellerSvc.FindSellerOverviewByID(ctx, req.BuyerId, req.SellerId)
+	s, err := h.sellerSvc.FindSellerOverviewByID(ctx, req.BuyerId, req.SellerId)
 	if err != nil {
 		return nil, err
 	}
 
 	return &user.FindSellerResponse{
-		FullName:     seller.FullName,
-		Email:        seller.Email,
-		RatingsCount: int64(seller.RatingsCount),
-		RatingSum:    int64(seller.RatingSum),
+		FullName:     s.FullName,
+		Email:        s.Email,
+		RatingsCount: int64(s.RatingsCount),
+		RatingSum:    int64(s.RatingSum),
 		RatingCategories: &user.RatingCategory{
-			One:   int32(seller.RatingCategories.One),
-			Two:   int32(seller.RatingCategories.Two),
-			Three: int32(seller.RatingCategories.Three),
-			Four:  int32(seller.RatingCategories.Four),
-			Five:  int32(seller.RatingCategories.Five),
+			One:   int32(s.RatingCategories.One),
+			Two:   int32(s.RatingCategories.Two),
+			Three: int32(s.RatingCategories.Three),
+			Four:  int32(s.RatingCategories.Four),
+			Five:  int32(s.RatingCategories.Five),
 		},
 	}, nil
 }

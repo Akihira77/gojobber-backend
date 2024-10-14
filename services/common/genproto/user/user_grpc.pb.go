@@ -22,6 +22,7 @@ const (
 	UserService_SaveBuyerData_FullMethodName       = "/UserService/SaveBuyerData"
 	UserService_FindSeller_FullMethodName          = "/UserService/FindSeller"
 	UserService_UpdateSellerBalance_FullMethodName = "/UserService/UpdateSellerBalance"
+	UserService_FindBuyer_FullMethodName           = "/UserService/FindBuyer"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -31,6 +32,7 @@ type UserServiceClient interface {
 	SaveBuyerData(ctx context.Context, in *SaveBuyerRequest, opts ...grpc.CallOption) (*SaveBuyerResponse, error)
 	FindSeller(ctx context.Context, in *FindSellerRequest, opts ...grpc.CallOption) (*FindSellerResponse, error)
 	UpdateSellerBalance(ctx context.Context, in *UpdateSellerBalanceRequest, opts ...grpc.CallOption) (*UpdateSellerBalanceResponse, error)
+	FindBuyer(ctx context.Context, in *FindBuyerRequest, opts ...grpc.CallOption) (*FindBuyerResponse, error)
 }
 
 type userServiceClient struct {
@@ -71,6 +73,16 @@ func (c *userServiceClient) UpdateSellerBalance(ctx context.Context, in *UpdateS
 	return out, nil
 }
 
+func (c *userServiceClient) FindBuyer(ctx context.Context, in *FindBuyerRequest, opts ...grpc.CallOption) (*FindBuyerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FindBuyerResponse)
+	err := c.cc.Invoke(ctx, UserService_FindBuyer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -78,6 +90,7 @@ type UserServiceServer interface {
 	SaveBuyerData(context.Context, *SaveBuyerRequest) (*SaveBuyerResponse, error)
 	FindSeller(context.Context, *FindSellerRequest) (*FindSellerResponse, error)
 	UpdateSellerBalance(context.Context, *UpdateSellerBalanceRequest) (*UpdateSellerBalanceResponse, error)
+	FindBuyer(context.Context, *FindBuyerRequest) (*FindBuyerResponse, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -96,6 +109,9 @@ func (UnimplementedUserServiceServer) FindSeller(context.Context, *FindSellerReq
 }
 func (UnimplementedUserServiceServer) UpdateSellerBalance(context.Context, *UpdateSellerBalanceRequest) (*UpdateSellerBalanceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSellerBalance not implemented")
+}
+func (UnimplementedUserServiceServer) FindBuyer(context.Context, *FindBuyerRequest) (*FindBuyerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FindBuyer not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -172,6 +188,24 @@ func _UserService_UpdateSellerBalance_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_FindBuyer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FindBuyerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).FindBuyer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_FindBuyer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).FindBuyer(ctx, req.(*FindBuyerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +224,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateSellerBalance",
 			Handler:    _UserService_UpdateSellerBalance_Handler,
+		},
+		{
+			MethodName: "FindBuyer",
+			Handler:    _UserService_FindBuyer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

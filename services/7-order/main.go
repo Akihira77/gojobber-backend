@@ -7,6 +7,7 @@ import (
 	"github.com/Akihira77/gojobber/services/7-order/handler"
 	"github.com/Akihira77/gojobber/services/7-order/util"
 	"github.com/joho/godotenv"
+	"github.com/stripe/stripe-go/v80"
 )
 
 func main() {
@@ -34,6 +35,7 @@ func main() {
 	ccs := handler.NewGRPCClients()
 	ccs.AddClient("USER_SERVICE", os.Getenv("USER_GRPC_PORT"))
 	ccs.AddClient("NOTIFICATION_SERVICE", os.Getenv("NOTIFICATION_GRPC_PORT"))
+	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 
 	go NewHttpServer(db, cld)
 

@@ -123,8 +123,17 @@ func chatRouter(base_url string, r fiber.Router) {
 func orderRouter(base_url string, r fiber.Router) {
 	oh := handler.NewOrderHandler(base_url)
 	r.Get("/health-check", oh.HealthCheck)
-	r.Post("/payment-intent/create", oh.CreatePaymentIntent)
-	r.Post("/payment-intent/:paymentId/confirm", oh.ConfirmPayment)
+	// r.Get("/:id", oh.FindOrderByID)
+	// r.Get("/buyer/my-orders", oh.FindOrdersByBuyerID)
+	// r.Get("/seller/my-orders", oh.FindOrdersBySellerID)
+	r.Post("/stripe-webhook", oh.HandleStripeWebhook)
+	r.Post("/payment-intents/create", oh.CreatePaymentIntent)
+	r.Post("/payment-intents/:paymentId/refund", nil)
+	// r.Post("/:orderId/complete", oh.OrderComplete)
+	// r.Post("/:orderId/cancel", oh.CancelOrder)
+	// r.Post("/seller/request-deadline-extension/:orderId", oh.RequestExtendingDeadline)
+	// r.Post("/buyer/approve-deadline-extension/:orderId", oh.ExtendDeadline)
+	// r.Post("/seller/deliver-order/:orderId", nil)
 }
 
 func reviewRouter(base_url string, r fiber.Router) {

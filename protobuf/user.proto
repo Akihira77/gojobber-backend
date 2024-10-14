@@ -59,8 +59,21 @@ message UpdateSellerBalanceResponse {
 	uint64 accountBalance = 9;
 }
 
+message FindBuyerRequest {
+    string buyerId = 1;
+}
+
+message FindBuyerResponse {
+	string id             = 1;
+	string username       = 2;
+	string email          = 3;
+	string country        = 4;
+	string profilePicture = 5;
+}
+
 service UserService {
     rpc SaveBuyerData(SaveBuyerRequest) returns (SaveBuyerResponse) {}
     rpc FindSeller(FindSellerRequest) returns (FindSellerResponse) {}
     rpc UpdateSellerBalance(UpdateSellerBalanceRequest) returns (UpdateSellerBalanceResponse) {}
+    rpc FindBuyer(FindBuyerRequest) returns (FindBuyerResponse) {}
 }
