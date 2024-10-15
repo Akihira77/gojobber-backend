@@ -82,3 +82,107 @@ func (oh *OrderHandler) BuyerDeadlineExtensionResponse(c *fiber.Ctx) error {
 
 	return c.Status(statusCode).Send(body)
 }
+
+func (oh *OrderHandler) FindOrderByID(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/%s", c.Params("orderId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Find Order By ID Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (oh *OrderHandler) FindOrdersByBuyerID(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/buyer/my-orders")
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Find My Orders As Buyer Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (oh *OrderHandler) FindOrdersBySellerID(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/seller/my-orders")
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Find My Orders As Seller Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (oh *OrderHandler) OrderComplete(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/%s/complete", c.Params("orderId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Order Completion Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (oh *OrderHandler) CancelOrder(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/%s/cancel", c.Params("orderId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Order Cancelation Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (oh *OrderHandler) OrderRefund(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/%s/refund", c.Params("orderId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Order Refunds Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (oh *OrderHandler) BuyerResponseForDeliveredOrder(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/deliver/%s/response", c.Params("orderId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Buyer Responding Delivered Order Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (oh *OrderHandler) DeliveringOrder(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/order/deliver/%s", c.Params("orderId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Seller Delivering Order Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}

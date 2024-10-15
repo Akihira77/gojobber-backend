@@ -43,7 +43,8 @@ func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App) {
 	api.Post("/:orderId/cancel", oh.SellerCancellingOrder)
 	api.Post("/deadline/extension/:orderId/request", oh.RequestDeadlineExtension)
 	api.Post("/deadline/extension/:orderId/response", oh.BuyerDeadlineExtensionResponse)
-	api.Post("/deliver/:orderId", nil)
+	api.Post("/deliver/:orderId", oh.SellerDeliverOrder)
+	api.Post("/deliver/:orderId/response", oh.BuyerResponseForDeliveredOrder)
 	api.Get("/notifications", nil)
 	api.Patch("/notification/mark-as-read", nil)
 

@@ -207,29 +207,29 @@ func (oh *OrderHttpHandler) HandleStripeWebhook(c *fiber.Ctx) error {
 
 	switch e.Type {
 	case stripe.EventTypePaymentIntentSucceeded:
-		ctx, cancel := context.WithTimeout(c.UserContext(), 200*time.Millisecond)
-		defer cancel()
-
-		var pi stripe.PaymentIntent
-		err := json.Unmarshal(e.Data.Raw, &pi)
-		if err != nil {
-			log.Printf("Error parsing webhook JSON: %v", err)
-			return fiber.NewError(fiber.StatusInternalServerError, "Unexpected error happened. Please try again.")
-		}
-
-		o, err := oh.orderSvc.FindOrderByPaymentIntentID(ctx, pi.ID)
-		if err != nil {
-			log.Printf("Order did not found:\n+%v", err)
-			return fiber.NewError(fiber.StatusNotFound, "Order is invalid")
-		}
-
-		_, err = oh.orderSvc.ChangeOrderStatus(ctx, *o, types.PENDING, fmt.Sprintf("Buyer Has Paid This Order. Order Status Change To [%s]", types.PENDING))
-		if err != nil {
-			log.Printf("Changing order status error:\n+%v", err)
-			return fiber.NewError(fiber.StatusInternalServerError, "Unexpected error happened. Please try again.")
-		}
-
 		go func() {
+			ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
+			defer cancel()
+
+			var pi stripe.PaymentIntent
+			err := json.Unmarshal(e.Data.Raw, &pi)
+			if err != nil {
+				log.Printf("Error parsing webhook JSON: %v", err)
+				return
+			}
+
+			o, err := oh.orderSvc.FindOrderByPaymentIntentID(ctx, pi.ID)
+			if err != nil {
+				log.Printf("Order did not found:\n+%v", err)
+				return
+			}
+
+			_, err = oh.orderSvc.ChangeOrderStatus(ctx, *o, types.PENDING, fmt.Sprintf("Buyer Has Paid This Order. Order Status Change To [%s]", types.PENDING))
+			if err != nil {
+				log.Printf("Changing order status error:\n+%v", err)
+				return
+			}
+
 			sellerEmail := pi.Metadata["seller_email"]
 			cc, err := oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
 			if err != nil {
@@ -255,15 +255,15 @@ func (oh *OrderHttpHandler) HandleStripeWebhook(c *fiber.Ctx) error {
 			}
 		}()
 	default:
-		log.Printf("Stripe Invalid Webhook Event:\n+%v", err)
-		return fiber.NewError(fiber.StatusInternalServerError, "Unknown webhook event")
+		log.Printf("Stripe Unhandled Webhook Event:\n+%v", err)
+		return fiber.NewError(fiber.StatusInternalServerError, "Unhandled webhook event")
 	}
 
 	return c.SendStatus(fiber.StatusOK)
 }
 
 func (oh *OrderHttpHandler) BuyerMarkOrderAsComplete(c *fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(c.UserContext(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(c.UserContext(), 1*time.Second)
 	defer cancel()
 
 	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
@@ -331,7 +331,7 @@ func (oh *OrderHttpHandler) BuyerMarkOrderAsComplete(c *fiber.Ctx) error {
 }
 
 func (oh *OrderHttpHandler) SellerCancellingOrder(c *fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(c.UserContext(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(c.UserContext(), 1*time.Second)
 	defer cancel()
 
 	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
@@ -501,7 +501,7 @@ func (oh *OrderHttpHandler) BuyerDeadlineExtensionResponse(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
 	defer cancel()
 
-	deadlineExtensionStatus := strings.ToUpper(c.Query("extension-status", "DISAPPROVED"))
+	status := strings.ToUpper(c.Query("extension-status", "REJECTED"))
 
 	data := new(types.DeadlineExtensionRequest)
 	err := c.BodyParser(data)
@@ -525,7 +525,7 @@ func (oh *OrderHttpHandler) BuyerDeadlineExtensionResponse(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while finding order")
 	}
 
-	msg, err := oh.orderSvc.DeadlineExtensionResponse(ctx, *o, deadlineExtensionStatus, data)
+	msg, err := oh.orderSvc.DeadlineExtensionResponse(ctx, *o, types.DeadlineExtensionStatus(status), data)
 	if err != nil {
 		log.Printf("BuyerDeadlineExtensionResponse error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
@@ -664,9 +664,76 @@ func (oh *OrderHttpHandler) BuyerRefundingOrder(c *fiber.Ctx) error {
 			"message": "Failed to refund",
 		})
 	default:
-		log.Printf("Unknown Stripe Refund Status:\n+%v", result)
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"message": "Unexpected error happened. Please try again.",
-		})
+		log.Printf("Unhandled Stripe Refund Status:\n+%v", result)
+		return fiber.NewError(http.StatusBadRequest, "Unhandled Stripe Refund Status")
 	}
+}
+
+// TODO: SEND EMAIL TO BUYER THAT SELLER HAS SENT THE ORDER RESULT
+func (oh *OrderHttpHandler) SellerDeliverOrder(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
+	defer cancel()
+
+	o, err := oh.orderSvc.FindOrderByID(ctx, c.Params("orderId"))
+	if err != nil {
+		log.Printf("SellerDeliverOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusNotFound, "Order is not found")
+	}
+
+	data := new(types.DeliveredHistory)
+	err = c.BodyParser(data)
+	if err != nil {
+		log.Printf("SellerDeliverOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusBadRequest, "Invalid Provided Data")
+	}
+
+	err = oh.validate.Struct(data)
+	if err != nil {
+		log.Printf("SellerDeliverOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusBadRequest, "Invalid Provided Data")
+	}
+
+	o, err = oh.orderSvc.DeliveringOrder(ctx, *o, *data)
+	if err != nil {
+		log.Printf("SellerDeliverOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusBadRequest, "Error while saving the provided data")
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"order": o,
+	})
+}
+
+func (oh *OrderHttpHandler) BuyerResponseForDeliveredOrder(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
+	defer cancel()
+
+	o, err := oh.orderSvc.FindOrderByID(ctx, c.Params("orderId"))
+	if err != nil {
+		log.Printf("BuyerNoteForDeliveredOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusNotFound, "Order is not found")
+	}
+
+	data := new(types.BuyerResponseOrderDelivered)
+	err = c.BodyParser(data)
+	if err != nil {
+		log.Printf("BuyerNoteForDeliveredOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusBadRequest, "Invalid Provided Data")
+	}
+
+	err = oh.validate.Struct(data)
+	if err != nil {
+		log.Printf("BuyerNoteForDeliveredOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusBadRequest, "Invalid Provided Data")
+	}
+
+	o, err = oh.orderSvc.OrderDeliveredResponse(ctx, *o, data)
+	if err != nil {
+		log.Printf("BuyerNoteForDeliveredOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusBadRequest, "Error while saving the provided data")
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"order": o,
+	})
 }

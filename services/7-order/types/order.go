@@ -10,6 +10,13 @@ import (
 	"gorm.io/gorm"
 )
 
+type DeadlineExtensionStatus string
+
+const (
+	ACCEPTED DeadlineExtensionStatus = "ACCEPTED"
+	REJECTED DeadlineExtensionStatus = "REJECTED"
+)
+
 type OrderStatus string
 
 const (
@@ -20,14 +27,6 @@ const (
 	REFUNDED         OrderStatus = "REFUNDED"         // BUYER HAS PAID BUT DECIDE TO REFUND THE ORDER
 	COMPLETED        OrderStatus = "COMPLETED"        // BUYER HAS PAID AND CONFIRM THAT THE ORDER IS COMPLETE
 )
-
-var OrderStatuses = map[string]OrderStatus{
-	string(PENDING):   PENDING,
-	string(PROCESS):   PROCESS,
-	string(CANCELED):  CANCELED,
-	string(REFUNDED):  REFUNDED,
-	string(COMPLETED): COMPLETED,
-}
 
 func (p *OrderStatus) Scan(value interface{}) error {
 	*p = OrderStatus(value.([]byte))
@@ -57,12 +56,21 @@ func (o *OrderEvents) Scan(value interface{}) error {
 }
 
 type DeliveredHistory struct {
-	ID            uuid.UUID `json:"id" gorm:"primaryKey"`
-	OrderID       string    `json:"orderId"`
-	ProgressNote  string    `json:"progressNote" gorm:"not null;"`
-	ResultURL     string    `json:"resultUrl" gorm:""`
+	ID            uuid.UUID `json:"id" gorm:"primaryKey;type:uuid;default:uuid_generate_v4();"`
+	OrderID       string    `json:"orderId" validate:"required"`
+	ProgressNote  string    `json:"progressNote" validate:"required" gorm:"not null;"`
+	ResultURL     string    `json:"resultUrl" validate:"url" gorm:""`
 	BuyerNote     string    `json:"buyerNote" gorm:""`
 	DeliveredDate time.Time `json:"deliveredDate" gorm:"not null;"`
+}
+
+type BuyerResponseOrderDelivered struct {
+	ID            uuid.UUID `json:"id" validate:"required,uuid"`
+	OrderID       string    `json:"orderId" validate:"required"`
+	ProgressNote  string    `json:"progressNote" validate:"required"`
+	ResultURL     string    `json:"resultUrl"`
+	BuyerNote     string    `json:"buyerNote" validate:"required"`
+	DeliveredDate time.Time `json:"deliveredDate" validate:"required"`
 }
 
 type Order struct {

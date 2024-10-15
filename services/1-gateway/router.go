@@ -118,17 +118,18 @@ func chatRouter(base_url string, r fiber.Router) {
 func orderRouter(base_url string, r fiber.Router) {
 	oh := handler.NewOrderHandler(base_url)
 	r.Get("/health-check", oh.HealthCheck)
-	// r.Get("/:id", oh.FindOrderByID)
-	// r.Get("/buyer/my-orders", oh.FindOrdersByBuyerID)
-	// r.Get("/seller/my-orders", oh.FindOrdersBySellerID)
+	r.Get("/:id", oh.FindOrderByID)
+	r.Get("/buyer/my-orders", oh.FindOrdersByBuyerID)
+	r.Get("/seller/my-orders", oh.FindOrdersBySellerID)
 	r.Post("/stripe-webhook", oh.HandleStripeWebhook)
 	r.Post("/payment-intents/create", oh.CreatePaymentIntent)
-	r.Post("/payment-intents/:paymentId/refund", nil)
 	r.Post("/deadline/extension/:orderId/request", oh.RequestDeadlineExtension)
 	r.Post("/deadline/extension/:orderId/response", oh.BuyerDeadlineExtensionResponse)
-	// r.Post("/:orderId/complete", oh.OrderComplete)
-	// r.Post("/:orderId/cancel", oh.CancelOrder)
-	// r.Post("/seller/deliver-order/:orderId", nil)
+	r.Post("/:orderId/complete", oh.OrderComplete)
+	r.Post("/:orderId/cancel", oh.CancelOrder)
+	r.Post("/:orderId/refund", oh.OrderRefund)
+	r.Post("/deliver/:orderId", oh.DeliveringOrder)
+	r.Post("/deliver/:orderId/response", oh.BuyerResponseForDeliveredOrder)
 }
 
 func reviewRouter(base_url string, r fiber.Router) {

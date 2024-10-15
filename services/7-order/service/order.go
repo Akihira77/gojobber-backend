@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math"
 	"time"
@@ -23,8 +24,9 @@ type OrderServiceImpl interface {
 	SaveOrder(ctx context.Context, data *types.CreateOrderDTO) (*types.Order, error)
 	ChangeOrderStatus(ctx context.Context, o types.Order, newStatus types.OrderStatus, reason string) (*types.Order, error)
 	RequestDeadlineExtension(ctx context.Context, o types.Order, data *types.DeadlineExtensionRequest) error
-	DeadlineExtensionResponse(ctx context.Context, o types.Order, extensionResponse string, data *types.DeadlineExtensionRequest) (string, error)
-	DeliveringOrder(ctx context.Context, o types.Order, dh types.DeliveredHistory) error
+	DeadlineExtensionResponse(ctx context.Context, o types.Order, status types.DeadlineExtensionStatus, data *types.DeadlineExtensionRequest) (string, error)
+	DeliveringOrder(ctx context.Context, o types.Order, dh types.DeliveredHistory) (*types.Order, error)
+	OrderDeliveredResponse(ctx context.Context, o types.Order, r *types.BuyerResponseOrderDelivered) (*types.Order, error)
 	FindMyOrderNotifications(ctx context.Context, sellerId string) error
 }
 
@@ -63,7 +65,7 @@ func (os *OrderService) SaveOrder(ctx context.Context, data *types.CreateOrderDT
 		GigTitle:           data.GigTitle,
 		GigDescription:     data.GigDescription,
 		Price:              data.Price,
-		Status:             types.OrderStatuses[string(types.AWAITING_PAYMENT)],
+		Status:             types.AWAITING_PAYMENT,
 		ServiceFee:         uint(math.Ceil((25 / 1000) * float64(data.Price))),
 		PaymentIntentID:    data.PaymentIntentID,
 		StripeClientSecret: data.StripeClientSecret,
@@ -83,17 +85,63 @@ func (os *OrderService) SaveOrder(ctx context.Context, data *types.CreateOrderDT
 	return &newOrder, result.Error
 }
 
-func (os *OrderService) DeliveringOrder(ctx context.Context, o types.Order, dh types.DeliveredHistory) error {
+func (os *OrderService) OrderDeliveredResponse(ctx context.Context, o types.Order, r *types.BuyerResponseOrderDelivered) (*types.Order, error) {
 	tx := os.db.
 		Debug().
-		WithContext(ctx)
+		WithContext(ctx).
+		Begin(&sql.TxOptions{
+			Isolation: sql.LevelSerializable,
+		})
+
+	result := tx.
+		Model(&types.DeliveredHistory{}).
+		Where("id = ?", r.ID).
+		Update("buyer_note", r.BuyerNote)
+	if result.Error != nil {
+		tx.Rollback()
+		return &o, result.Error
+	}
+
+	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
+		Event:     fmt.Sprintf("Buyer Responded Your Order Delivered Progress"),
+		CreatedAt: time.Now(),
+	})
+	result = tx.Save(&o)
+	if result.Error != nil {
+		tx.Rollback()
+		return &o, result.Error
+	}
+
+	result = tx.
+		Model(&types.Order{}).
+		Preload("DeliveredHistories").
+		Where("id = ?", o.ID).
+		First(&o)
+	if result.Error != nil {
+		tx.Rollback()
+		return &o, result.Error
+	}
+
+	result = tx.Commit()
+
+	return &o, result.Error
+
+}
+
+func (os *OrderService) DeliveringOrder(ctx context.Context, o types.Order, dh types.DeliveredHistory) (*types.Order, error) {
+	tx := os.db.
+		Debug().
+		WithContext(ctx).
+		Begin(&sql.TxOptions{
+			Isolation: sql.LevelSerializable,
+		})
 
 	result := tx.
 		Model(&types.DeliveredHistory{}).
 		Create(&dh)
 	if result.Error != nil {
 		tx.Rollback()
-		return result.Error
+		return &o, result.Error
 	}
 
 	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
@@ -102,12 +150,23 @@ func (os *OrderService) DeliveringOrder(ctx context.Context, o types.Order, dh t
 	})
 	result = tx.Save(&o)
 	if result.Error != nil {
-		return result.Error
+		tx.Rollback()
+		return &o, result.Error
+	}
+
+	result = tx.
+		Model(&types.Order{}).
+		Preload("DeliveredHistories").
+		Where("id = ?", o.ID).
+		First(&o)
+	if result.Error != nil {
+		tx.Rollback()
+		return &o, result.Error
 	}
 
 	result = tx.Commit()
 
-	return result.Error
+	return &o, result.Error
 }
 
 func (os *OrderService) RequestDeadlineExtension(ctx context.Context, o types.Order, data *types.DeadlineExtensionRequest) error {
@@ -125,10 +184,10 @@ func (os *OrderService) RequestDeadlineExtension(ctx context.Context, o types.Or
 	return result.Error
 }
 
-func (os *OrderService) DeadlineExtensionResponse(ctx context.Context, o types.Order, extensionResponse string, data *types.DeadlineExtensionRequest) (string, error) {
-	switch extensionResponse {
-	case "APPROVED":
-		msg := fmt.Sprintf("Buyer Approved Seller Order Deadline Extension From [%v] To [%v]", o.Deadline, o.Deadline.Add(time.Duration(data.NumberOfDays)))
+func (os *OrderService) DeadlineExtensionResponse(ctx context.Context, o types.Order, status types.DeadlineExtensionStatus, data *types.DeadlineExtensionRequest) (string, error) {
+	switch status {
+	case types.ACCEPTED:
+		msg := fmt.Sprintf("Buyer Accepted Seller Order Deadline Extension From [%v] To [%v]", o.Deadline, o.Deadline.Add(time.Duration(data.NumberOfDays)))
 		o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
 			Event:     msg,
 			CreatedAt: time.Now(),
@@ -141,8 +200,8 @@ func (os *OrderService) DeadlineExtensionResponse(ctx context.Context, o types.O
 			Save(&o)
 
 		return msg, result.Error
-	case "DISAPPROVED":
-		msg := fmt.Sprintf("Buyer Disapproved Your Order Deadline Extension With Reason:\n%s", data.Reason)
+	case types.REJECTED:
+		msg := fmt.Sprintf("Buyer Rejected Your Order Deadline Extension With Reason:\n%s", data.Reason)
 		o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
 			Event:     msg,
 			CreatedAt: time.Now(),
