@@ -22,6 +22,7 @@ import (
 	"github.com/stripe/stripe-go/v80/paymentintent"
 	"github.com/stripe/stripe-go/v80/refund"
 	"github.com/stripe/stripe-go/v80/webhook"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
@@ -157,6 +158,10 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 		BuyerId:  "",
 		SellerId: data.SellerID,
 	})
+	if err != nil {
+		log.Printf("CreatePaymentIntent error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while finding seller related to this gig")
+	}
 
 	pi, err := paymentintent.New(&stripe.PaymentIntentParams{
 		Amount:   stripe.Int64(int64(data.Price * 100)),
@@ -167,8 +172,9 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 		ReceiptEmail: &userInfo.Email,
 		OnBehalfOf:   stripe.String(s.StripeAccountId),
 		Metadata: map[string]string{
-			"buyer_id":  data.BuyerID,
-			"seller_id": data.SellerID,
+			"buyer_id":     data.BuyerID,
+			"seller_id":    data.SellerID,
+			"seller_email": s.Email,
 		},
 	})
 	if err != nil {
@@ -223,7 +229,31 @@ func (oh *OrderHttpHandler) HandleStripeWebhook(c *fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusInternalServerError, "Unexpected error happened. Please try again.")
 		}
 
-		//TODO: SEND EMAIL TO SELLER
+		go func() {
+			sellerEmail := pi.Metadata["seller_email"]
+			cc, err := oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+			if err != nil {
+				log.Printf("HandleStripeWebhook Error:\n+%v", err)
+				return
+			}
+
+			notificationGrpcClient := notification.NewNotificationServiceClient(cc)
+			_, err = notificationGrpcClient.NotifySellerOrderHasBeenMade(context.TODO(), &notification.NotifySellerGotAnOrderRequest{
+				ReceiverEmail: sellerEmail,
+				Message:       fmt.Sprintf("You Recevie An Order From Buyer [%s]", o.BuyerID),
+				Detail: &notification.OrderDetail{
+					GigTitle:       o.GigTitle,
+					GigDescription: o.GigDescription,
+					Price:          o.Price,
+					ServiceFee:     uint64(o.ServiceFee),
+					Deadline:       timestamppb.New(o.Deadline),
+				},
+			})
+			if err != nil {
+				log.Printf("HandleStripeWebhook Error:\n+%v", err)
+				return
+			}
+		}()
 	default:
 		log.Printf("Stripe Invalid Webhook Event:\n+%v", err)
 		return fiber.NewError(fiber.StatusInternalServerError, "Unknown webhook event")

@@ -1,10 +1,12 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/Akihira77/gojobber/services/2-notification/helper"
+	"github.com/Akihira77/gojobber/services/common/genproto/notification"
 )
 
 type NotificationService struct {
@@ -20,12 +22,33 @@ type NotificationServiceImpl interface {
 	BuyerDeadlineExtensionResponse(receiverEmail, message string) error
 	BuyerRefundsAnOrder(receiverEmail, reason string) error
 	SellerCanceledAnOrder(receiverEmail, reason string) error
+	NotifySellerGotAnOrder(data *notification.NotifySellerGotAnOrderRequest) error
 }
 
 func NewNotificationService() NotificationServiceImpl {
 	return &NotificationService{
 		errCh: make(chan error, 1),
 	}
+}
+
+// TODO: IMPLEMENT HTML TEMPLATE
+func (ns *NotificationService) NotifySellerGotAnOrder(data *notification.NotifySellerGotAnOrderRequest) error {
+	b, err := json.Marshal(data.Detail)
+	if err != nil {
+		return fmt.Errorf("Error parsing payload data %v", err)
+	}
+
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		errCh <- helper.SendMail(data.ReceiverEmail, data.Message, string(b))
+	}()
+
+	wg.Wait()
+	close(errCh)
+	return <-errCh
 }
 
 func (ns *NotificationService) SellerCanceledAnOrder(receiverEmail string, reason string) error {

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 option go_package="github.com/Akihira77/common/notification";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 //INFO: AUTH SERVICE
 message VerifyingEmailRequest {
@@ -58,6 +59,20 @@ message BuyerRefundsOrderRequest {
     string reason = 2;
 }
 
+message OrderDetail {
+    string gigTitle = 1;
+    string gigDescription = 2;
+    uint64 price = 3;
+    uint64 serviceFee = 4;
+    google.protobuf.Timestamp deadline = 5;
+}
+
+message NotifySellerGotAnOrderRequest {
+    string receiverEmail = 1;
+    string message = 2;
+    OrderDetail detail = 3;
+}
+
 service NotificationService {
     // From Auth Service
     rpc UserVerifyingEmail(VerifyingEmailRequest) returns (google.protobuf.Empty) {}
@@ -74,4 +89,5 @@ service NotificationService {
     rpc SellerCanceledAnOrder(SellerCancelOrderRequest) returns (google.protobuf.Empty) {}
     rpc BuyerDeadlineExtensionResponse(BuyerDeadlineExtension) returns (google.protobuf.Empty) {}
     rpc BuyerRefundsAnOrder(BuyerRefundsOrderRequest) returns (google.protobuf.Empty) {}
+    rpc NotifySellerOrderHasBeenMade(NotifySellerGotAnOrderRequest) returns (google.protobuf.Empty) {}
 }
