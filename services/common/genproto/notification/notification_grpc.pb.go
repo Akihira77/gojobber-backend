@@ -30,6 +30,7 @@ const (
 	NotificationService_BuyerDeadlineExtensionResponse_FullMethodName = "/NotificationService/BuyerDeadlineExtensionResponse"
 	NotificationService_BuyerRefundsAnOrder_FullMethodName            = "/NotificationService/BuyerRefundsAnOrder"
 	NotificationService_NotifySellerOrderHasBeenMade_FullMethodName   = "/NotificationService/NotifySellerOrderHasBeenMade"
+	NotificationService_NotifySellerGotAReview_FullMethodName         = "/NotificationService/NotifySellerGotAReview"
 )
 
 // NotificationServiceClient is the client API for NotificationService service.
@@ -49,6 +50,7 @@ type NotificationServiceClient interface {
 	BuyerDeadlineExtensionResponse(ctx context.Context, in *BuyerDeadlineExtension, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	BuyerRefundsAnOrder(ctx context.Context, in *BuyerRefundsOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	NotifySellerOrderHasBeenMade(ctx context.Context, in *NotifySellerGotAnOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	NotifySellerGotAReview(ctx context.Context, in *NotifySellerGotAReviewRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type notificationServiceClient struct {
@@ -159,6 +161,16 @@ func (c *notificationServiceClient) NotifySellerOrderHasBeenMade(ctx context.Con
 	return out, nil
 }
 
+func (c *notificationServiceClient) NotifySellerGotAReview(ctx context.Context, in *NotifySellerGotAReviewRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, NotificationService_NotifySellerGotAReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NotificationServiceServer is the server API for NotificationService service.
 // All implementations must embed UnimplementedNotificationServiceServer
 // for forward compatibility.
@@ -176,6 +188,7 @@ type NotificationServiceServer interface {
 	BuyerDeadlineExtensionResponse(context.Context, *BuyerDeadlineExtension) (*emptypb.Empty, error)
 	BuyerRefundsAnOrder(context.Context, *BuyerRefundsOrderRequest) (*emptypb.Empty, error)
 	NotifySellerOrderHasBeenMade(context.Context, *NotifySellerGotAnOrderRequest) (*emptypb.Empty, error)
+	NotifySellerGotAReview(context.Context, *NotifySellerGotAReviewRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedNotificationServiceServer()
 }
 
@@ -215,6 +228,9 @@ func (UnimplementedNotificationServiceServer) BuyerRefundsAnOrder(context.Contex
 }
 func (UnimplementedNotificationServiceServer) NotifySellerOrderHasBeenMade(context.Context, *NotifySellerGotAnOrderRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NotifySellerOrderHasBeenMade not implemented")
+}
+func (UnimplementedNotificationServiceServer) NotifySellerGotAReview(context.Context, *NotifySellerGotAReviewRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifySellerGotAReview not implemented")
 }
 func (UnimplementedNotificationServiceServer) mustEmbedUnimplementedNotificationServiceServer() {}
 func (UnimplementedNotificationServiceServer) testEmbeddedByValue()                             {}
@@ -417,6 +433,24 @@ func _NotificationService_NotifySellerOrderHasBeenMade_Handler(srv interface{}, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_NotifySellerGotAReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifySellerGotAReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).NotifySellerGotAReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_NotifySellerGotAReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).NotifySellerGotAReview(ctx, req.(*NotifySellerGotAReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // NotificationService_ServiceDesc is the grpc.ServiceDesc for NotificationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -463,6 +497,10 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "NotifySellerOrderHasBeenMade",
 			Handler:    _NotificationService_NotifySellerOrderHasBeenMade_Handler,
+		},
+		{
+			MethodName: "NotifySellerGotAReview",
+			Handler:    _NotificationService_NotifySellerGotAReview_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -136,4 +136,8 @@ func orderRouter(base_url string, r fiber.Router) {
 func reviewRouter(base_url string, r fiber.Router) {
 	rh := handler.NewReviewHandler(base_url)
 	r.Get("/health-check", rh.HealthCheck)
+	r.Get("/seller/:sellerId", rh.FindSellerReviews)
+	r.Post("/", rh.Add)
+	r.Patch("/:reviewId", rh.Update)
+	r.Delete("/:reviewId", rh.Remove)
 }

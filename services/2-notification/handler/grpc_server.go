@@ -112,3 +112,13 @@ func (h *NotificationGRPCHandler) NotifySellerOrderHasBeenMade(ctx context.Conte
 	}
 	return nil, err
 }
+
+func (h *NotificationGRPCHandler) otifySellerGotAReview(ctx context.Context, req *notification.NotifySellerGotAReviewRequest) (*emptypb.Empty, error) {
+	log.Println("Receiving data", req)
+	err := h.notificationSvc.NotifySellerGotAReview(req)
+
+	if err != nil {
+		log.Printf("NotifySellerGotAReview for [%s] is error: %v", req.ReceiverEmail, err)
+	}
+	return nil, err
+}
