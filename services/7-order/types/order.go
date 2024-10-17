@@ -89,6 +89,16 @@ type Order struct {
 	InvoiceID          string             `json:"invoiceId,omitempty"`
 	StartDate          time.Time          `json:"startDate" gorm:"not null;"`
 	Deadline           time.Time          `json:"deadline" gorm:"not null;"`
+	// Unread             bool               `json:"unread" gorm:"default:true;not null;"`
+}
+
+type OrderNotificationDTO struct {
+	ID        string      `json:"id"`
+	GigTitle  string      `json:"gigTitle"`
+	Status    OrderStatus `json:"status"`
+	Price     uint64      `json:"price"`
+	StartDate time.Time   `json:"startDate"`
+	Deadline  time.Time   `json:"deadline"`
 }
 
 type CreateOrderDTO struct {

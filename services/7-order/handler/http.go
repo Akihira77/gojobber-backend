@@ -737,3 +737,24 @@ func (oh *OrderHttpHandler) BuyerResponseForDeliveredOrder(c *fiber.Ctx) error {
 		"order": o,
 	})
 }
+
+func (oh *OrderHttpHandler) FindMyOrdersNotifications(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
+	defer cancel()
+
+	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
+	if !ok {
+		log.Println(userInfo)
+		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
+	}
+
+	orders, err := oh.orderSvc.FindMyOrderNotifications(ctx, userInfo.UserID)
+	if err != nil {
+		log.Printf("FindMyOrdersNotifications Error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while finding your orders")
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"orders": orders,
+	})
+}

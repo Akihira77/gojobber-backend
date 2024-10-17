@@ -27,7 +27,8 @@ type OrderServiceImpl interface {
 	DeadlineExtensionResponse(ctx context.Context, o types.Order, status types.DeadlineExtensionStatus, data *types.DeadlineExtensionRequest) (string, error)
 	DeliveringOrder(ctx context.Context, o types.Order, dh types.DeliveredHistory) (*types.Order, error)
 	OrderDeliveredResponse(ctx context.Context, o types.Order, r *types.BuyerResponseOrderDelivered) (*types.Order, error)
-	FindMyOrderNotifications(ctx context.Context, sellerId string) error
+	FindMyOrderNotifications(ctx context.Context, userID string) ([]types.OrderNotificationDTO, error)
+	MarkReadsMyOrderNotifications(ctx context.Context, userID string) error
 }
 
 func NewOrderService(db *gorm.DB) OrderServiceImpl {
@@ -218,8 +219,27 @@ func (os *OrderService) DeadlineExtensionResponse(ctx context.Context, o types.O
 	}
 }
 
-func (os *OrderService) FindMyOrderNotifications(ctx context.Context, sellerId string) error {
-	panic("unimplemented")
+func (os *OrderService) FindMyOrderNotifications(ctx context.Context, userID string) ([]types.OrderNotificationDTO, error) {
+	var orders []types.OrderNotificationDTO
+	result := os.db.
+		Debug().
+		WithContext(ctx).
+		Model(&types.Order{}).
+		Where("buyer_id = ?", userID).
+		Find(&orders)
+
+	return orders, result.Error
+}
+
+func (os *OrderService) MarkReadsMyOrderNotifications(ctx context.Context, userID string) error {
+	result := os.db.
+		Debug().
+		WithContext(ctx).
+		Model(&types.Order{}).
+		Where("buyer_id = ?", userID).
+		Update("unread = ?", false)
+
+	return result.Error
 }
 
 func (os *OrderService) FindOrderByID(ctx context.Context, id string) (*types.Order, error) {

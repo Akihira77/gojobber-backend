@@ -121,6 +121,7 @@ func orderRouter(base_url string, r fiber.Router) {
 	r.Get("/:id", oh.FindOrderByID)
 	r.Get("/buyer/my-orders", oh.FindOrdersByBuyerID)
 	r.Get("/seller/my-orders", oh.FindOrdersBySellerID)
+	r.Get("/buyer/my-orders-notifications", oh.FindMyOrdersNotifications)
 	r.Post("/stripe-webhook", oh.HandleStripeWebhook)
 	r.Post("/payment-intents/create", oh.CreatePaymentIntent)
 	r.Post("/deadline/extension/:orderId/request", oh.RequestDeadlineExtension)

@@ -45,6 +45,9 @@ func MainRouter(db *gorm.DB, app *fiber.App) {
 	api.Get("/seller/random/:count", sh.GetRandomSellers)
 	api.Post("/seller", sh.Create)
 	api.Put("/seller", sh.Update)
+
+	//TODO: IMPLEMENT BALANCE RELATED STUFF
+	api.Post("/seller/balance/withdraw", nil)
 }
 
 func verifyGatewayReq(c *fiber.Ctx) error {
