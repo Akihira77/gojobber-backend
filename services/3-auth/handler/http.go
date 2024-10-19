@@ -239,7 +239,7 @@ func (ah *AuthHttpHandler) VerifyEmail(c *fiber.Ctx) error {
 		return fiber.ErrInternalServerError
 	}
 
-	result, err := ah.authSvc.UpdateEmailVerification(ctx, userInfo.UserID, true)
+	result, err := ah.authSvc.UpdateEmailVerification(ctx, userInfo.UserID, true, "")
 	if err != nil {
 		log.Printf("verifyemail error:\n%+v", err)
 		return fiber.ErrInternalServerError

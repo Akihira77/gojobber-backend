@@ -75,15 +75,15 @@ func userRouter(base_url string, r fiber.Router) {
 	uh := handler.NewUserHandler(base_url)
 	r.Get("/health-check", uh.HealthCheck)
 
-	r.Get("/buyer/my-info", uh.GetMyBuyerInfo)
-	r.Get("/buyer/:username", uh.FindBuyerByUsername)
+	r.Get("/buyers/my-info", uh.GetMyBuyerInfo)
+	r.Get("/buyers/:username", uh.FindBuyerByUsername)
 
-	r.Get("/seller/my-info", uh.GetMySellerInfo)
-	r.Get("/seller/id/:id", uh.FindSellerByID)
-	r.Get("/seller/username/:username", uh.FindSellerByUsername)
-	r.Get("/seller/random/:count", uh.GetRandomSellers)
-	r.Post("/seller", uh.Create)
-	r.Put("/seller", uh.Update)
+	r.Get("/sellers/my-info", uh.GetMySellerInfo)
+	r.Get("/sellers/id/:id", uh.FindSellerByID)
+	r.Get("/sellers/username/:username", uh.FindSellerByUsername)
+	r.Get("/sellers/random/:count", uh.GetRandomSellers)
+	r.Post("/sellers", uh.Create)
+	r.Put("/sellers", uh.Update)
 
 }
 
@@ -92,10 +92,10 @@ func gigRouter(base_url string, r fiber.Router) {
 	r.Get("/health-check", gh.HealthCheck)
 
 	r.Get("/id/:id", gh.FindGigByID)
-	r.Get("/seller/:sellerId/:page/:size", gh.FindSellerActiveGigs)
-	r.Get("/seller/inactive/:sellerId/:page/:size", gh.FindSellerInactiveGigs)
+	r.Get("/sellers/active/:page/:size", gh.FindSellerActiveGigs)
+	r.Get("/sellers/inactive/:page/:size", gh.FindSellerInactiveGigs)
 	r.Get("/category/:category/:page/:size", gh.FindGigsByCategory)
-	r.Get("/popular/:category", gh.GetPopularGigs)
+	r.Get("/popular", gh.GetPopularGigs)
 	r.Get("/similar/:gigId/:page/:size", gh.FindSimilarGigs)
 	r.Get("/search/:page/:size", gh.GigQuerySearch)
 	r.Post("", gh.CreateGig)
@@ -112,7 +112,7 @@ func chatRouter(base_url string, r fiber.Router) {
 	r.Get("/my-conversations", ch.GetAllMyConversations)
 	r.Get("/id/:conversationId", ch.GetMessagesInsideConversation)
 	r.Post("", ch.InsertMessage)
-
+	r.Patch("/offer/:messageId/cancel", ch.SellerCancelOffer)
 }
 
 func orderRouter(base_url string, r fiber.Router) {
@@ -122,8 +122,13 @@ func orderRouter(base_url string, r fiber.Router) {
 	r.Get("/buyer/my-orders", oh.FindOrdersByBuyerID)
 	r.Get("/seller/my-orders", oh.FindOrdersBySellerID)
 	r.Get("/buyer/my-orders-notifications", oh.FindMyOrdersNotifications)
-	r.Post("/stripe-webhook", oh.HandleStripeWebhook)
+	r.Post("/stripe/webhook", oh.HandleStripeWebhook)
+
 	r.Post("/payment-intents/create", oh.CreatePaymentIntent)
+	//NOTE: JUST FOR TESTING
+	r.Post("/payment-intents/:paymentId/confirm", oh.ConfirmPayment)
+	r.Post("/stripe/tos-acceptance", oh.StripeTOSAcceptance)
+
 	r.Post("/deadline/extension/:orderId/request", oh.RequestDeadlineExtension)
 	r.Post("/deadline/extension/:orderId/response", oh.BuyerDeadlineExtensionResponse)
 	r.Post("/:orderId/complete", oh.OrderComplete)

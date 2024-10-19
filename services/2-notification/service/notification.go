@@ -24,12 +24,28 @@ type NotificationServiceImpl interface {
 	SellerCanceledAnOrder(receiverEmail, reason string) error
 	NotifySellerGotAnOrder(data *notification.NotifySellerGotAnOrderRequest) error
 	NotifySellerGotAReview(data *notification.NotifySellerGotAReviewRequest) error
+	NotifyBuyerSellerDeliveredOrder(data *notification.NotifyBuyerOrderDeliveredRequest) error
 }
 
 func NewNotificationService() NotificationServiceImpl {
 	return &NotificationService{
 		errCh: make(chan error, 1),
 	}
+}
+
+// TODO: IMPLEMENT HTML TEMPLATE
+func (ns *NotificationService) NotifyBuyerSellerDeliveredOrder(data *notification.NotifyBuyerOrderDeliveredRequest) error {
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		errCh <- helper.SendMail(data.ReceiverEmail, fmt.Sprintf("Seller Has Sent Your Order Progress. Check Out Your Order!"), "Check Your Order Progress")
+	}()
+
+	wg.Wait()
+	close(errCh)
+	return <-errCh
 }
 
 // TODO: IMPLEMENT HTML TEMPLATE

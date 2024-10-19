@@ -101,11 +101,13 @@ type Seller struct {
 }
 
 type SellerOverview struct {
+	ID               string         `json:"id"`
 	FullName         string         `json:"fullName"`
 	Email            string         `json:"email"`
 	RatingsCount     uint64         `json:"ratingsCount"`
 	RatingSum        uint64         `json:"ratingSum"`
 	RatingCategories RatingCategory `json:"ratingCategories"`
+	StripeAccountID  string         `json:"stringAccountId"`
 }
 
 type SellerIncBalanceDTO struct {

@@ -21,7 +21,7 @@ const (
 	BASE_PATH = "api/v1/orders"
 )
 
-func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App) {
+func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App, ccs *handler.GRPCClients) {
 	app.Get("health-check", func(c *fiber.Ctx) error {
 		return c.Status(http.StatusOK).SendString("Order Service is healthy and OK.")
 	})
@@ -31,15 +31,21 @@ func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App) {
 	api.Use(authOnly)
 
 	os := service.NewOrderService(db)
-	oh := handler.NewOrderHttpHandler(os)
+	oh := handler.NewOrderHttpHandler(os, ccs)
 
 	api.Get("/:id", oh.FindOrderByID)
 	api.Get("/buyer/my-orders", oh.FindMyOrdersAsBuyer)
 	api.Get("/seller/my-orders", oh.FindMyOrdersAsSeller)
+
 	api.Post("/payment-intents/create", oh.CreatePaymentIntent)
-	api.Post("/stripe-webhook", oh.HandleStripeWebhook)
+	//NOTE: JUST FOR TESTING
+	api.Post("/payment-intents/:paymentId/confirm", oh.ConfirmPayment)
+	api.Post("/stripe/tos-acceptance", oh.StripeTOSAcceptance)
+
+	api.Post("/stripe/webhook", oh.HandleStripeWebhook)
 	api.Post("/:orderId/refund", oh.BuyerRefundingOrder)
 	api.Post("/:orderId/complete", oh.BuyerMarkOrderAsComplete)
+	api.Post("/:orderId/acknowledge", oh.SellerAcknowledgeOrder)
 	api.Post("/:orderId/cancel", oh.SellerCancellingOrder)
 	api.Post("/deadline/extension/:orderId/request", oh.RequestDeadlineExtension)
 	api.Post("/deadline/extension/:orderId/response", oh.BuyerDeadlineExtensionResponse)
@@ -94,9 +100,8 @@ func authOnly(c *fiber.Ctx) error {
 	}
 
 	claims, ok := token.Claims.(*types.JWTClaims)
-	log.Println(claims)
 	if !ok {
-		log.Println("token is not matched with claims")
+		log.Println("token is not matched with claims: claims", token.Claims)
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 

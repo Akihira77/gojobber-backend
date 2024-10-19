@@ -33,7 +33,7 @@ func (ch *ChatHandler) HealthCheck(c *fiber.Ctx) error {
 }
 
 func (ch *ChatHandler) GetAllMyConversations(c *fiber.Ctx) error {
-	route := ch.base_url + fmt.Sprintf("/api/v1/chat/my-conversations")
+	route := ch.base_url + fmt.Sprintf("/api/v1/chats/my-conversations")
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("CHAT - find all my conversations error", errs)
@@ -46,7 +46,7 @@ func (ch *ChatHandler) GetAllMyConversations(c *fiber.Ctx) error {
 }
 
 func (ch *ChatHandler) GetMessagesInsideConversation(c *fiber.Ctx) error {
-	route := ch.base_url + fmt.Sprintf("/api/v1/chat/id/%s", c.Params("conversationId"))
+	route := ch.base_url + fmt.Sprintf("/api/v1/chats/id/%s", c.Params("conversationId"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("CHAT - get messages inside conversation error", errs)
@@ -59,7 +59,7 @@ func (ch *ChatHandler) GetMessagesInsideConversation(c *fiber.Ctx) error {
 }
 
 func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
-	route := ch.base_url + fmt.Sprintf("/api/v1/chat")
+	route := ch.base_url + fmt.Sprintf("/api/v1/chats")
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("CHAT - inserting message error", errs)
@@ -97,6 +97,19 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 	}
 	b, _ := json.Marshal(msg)
 	go SendMessage(res.SenderID, res.Receiver.ID, b)
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (ch *ChatHandler) SellerCancelOffer(c *fiber.Ctx) error {
+	route := ch.base_url + fmt.Sprintf("/api/v1/chats/offer/%s/cancel", c.Params("messageId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Seller Cancel Offer Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
 
 	return c.Status(statusCode).Send(body)
 }

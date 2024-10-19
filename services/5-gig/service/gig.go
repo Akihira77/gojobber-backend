@@ -11,7 +11,6 @@ import (
 
 	"github.com/Akihira77/gojobber/services/5-gig/types"
 	"github.com/Akihira77/gojobber/services/common/genproto/user"
-	"google.golang.org/grpc"
 	"gorm.io/gorm"
 )
 
@@ -27,7 +26,7 @@ type GigServiceImpl interface {
 	Update(ctx context.Context, data *types.UpdateGigDTO) (*types.GigDTO, error)
 	ChangeGigStatus(ctx context.Context, gigId string, gigStatus bool) error
 	DeleteGigByID(ctx context.Context, gigId string) error
-	FindAndMapSellerInGigs(ctx context.Context, grpcClient *grpc.ClientConn, gigs []types.GigDTO) ([]types.GigSellerDTO, error)
+	FindAndMapSellerInGigs(ctx context.Context, userGrpcClient user.UserServiceClient, gigs []types.GigDTO) ([]types.GigSellerDTO, error)
 }
 
 type GigService struct {
@@ -40,7 +39,7 @@ func NewGigService(db *gorm.DB) GigServiceImpl {
 	}
 }
 
-func (gs *GigService) FindAndMapSellerInGigs(ctx context.Context, grpcClient *grpc.ClientConn, gigs []types.GigDTO) ([]types.GigSellerDTO, error) {
+func (gs *GigService) FindAndMapSellerInGigs(ctx context.Context, userGrpcClient user.UserServiceClient, gigs []types.GigDTO) ([]types.GigSellerDTO, error) {
 	var result []types.GigSellerDTO
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(gigs))
@@ -53,7 +52,6 @@ func (gs *GigService) FindAndMapSellerInGigs(ctx context.Context, grpcClient *gr
 			newCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 			defer cancel()
 
-			userGrpcClient := user.NewUserServiceClient(grpcClient)
 			s, err := userGrpcClient.FindSeller(newCtx, &user.FindSellerRequest{
 				SellerId: gig.SellerID,
 			})
@@ -274,7 +272,7 @@ func (gs *GigService) Create(ctx context.Context, data *types.CreateGigDTO) (*ty
 
 	return &types.GigDTO{
 		ID:                   gig.ID,
-		SellerID:             gig.ID.String(),
+		SellerID:             gig.SellerID,
 		Title:                gig.Title,
 		Description:          gig.Description,
 		Category:             gig.Category,
@@ -408,7 +406,7 @@ func (gs *GigService) Update(ctx context.Context, data *types.UpdateGigDTO) (*ty
 
 	return &types.GigDTO{
 		ID:                   gig.ID,
-		SellerID:             gig.ID.String(),
+		SellerID:             gig.SellerID,
 		Title:                gig.Title,
 		Description:          gig.Description,
 		Category:             gig.Category,

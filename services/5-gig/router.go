@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/Akihira77/gojobber/services/5-gig/handler"
-	svc "github.com/Akihira77/gojobber/services/5-gig/service"
+	"github.com/Akihira77/gojobber/services/5-gig/service"
 	"github.com/Akihira77/gojobber/services/5-gig/types"
 	"github.com/Akihira77/gojobber/services/5-gig/util"
 	"github.com/gofiber/fiber/v2"
@@ -27,19 +27,19 @@ func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App, ccs *handler.
 	api := app.Group(BASE_PATH)
 	api.Use(verifyGatewayReq)
 
-	gigSvc := svc.NewGigService(db)
+	gigSvc := service.NewGigService(db)
 	gigHandler := handler.NewGigHandler(gigSvc, cld, ccs)
 
 	api.Get("/id/:id", gigHandler.FindGigByID)
 	api.Get("/search/:page/:size", gigHandler.GigQuerySearch)
 	api.Get("/category/:category/:page/:size", gigHandler.FindGigByCategory)
-	api.Get("/popular/:category", gigHandler.GetPopularGigs)
+	api.Get("/popular", gigHandler.GetPopularGigs)
 	api.Get("/similar/:gigId/:page/:size", gigHandler.FindSimilarGigs)
 
 	api.Use(authOnly)
 
-	api.Get("/seller/:sellerId/:page/:size", gigHandler.FindSellerGigs)
-	api.Get("/seller/inactive/:sellerId/:page/:size", gigHandler.FindSellerInactiveGigs)
+	api.Get("/sellers/active/:page/:size", gigHandler.FindSellerGigs)
+	api.Get("/sellers/inactive/:page/:size", gigHandler.FindSellerInactiveGigs)
 	api.Post("", gigHandler.Create)
 	api.Put("/:sellerId/:gigId", gigHandler.Update)
 	api.Patch("/update-status/:sellerId/:gigId", gigHandler.ActivateGigStatus)

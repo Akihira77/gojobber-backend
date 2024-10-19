@@ -36,6 +36,7 @@ func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App, grpcServices 
 	api.Get("/my-conversations", ch.GetAllMyConversations)
 	api.Get("/id/:conversationId", ch.GetMessagesInsideConversation)
 	api.Post("", ch.InsertMessage)
+	api.Patch("/offer/:messageId/cancel", ch.SellerCancelOffer)
 }
 
 func verifyGatewayReq(c *fiber.Ctx) error {

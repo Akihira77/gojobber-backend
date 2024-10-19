@@ -2,8 +2,7 @@ package types
 
 import (
 	"database/sql/driver"
-	"encoding/json"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,30 +28,21 @@ const (
 )
 
 func (p *OrderStatus) Scan(value interface{}) error {
-	*p = OrderStatus(value.([]byte))
+	*p = OrderStatus(value.(string))
+	log.Println("scan p", p)
 	return nil
 }
 
 func (p OrderStatus) Value() (driver.Value, error) {
+	log.Println("value p", p)
 	return string(p), nil
 }
 
 type OrderEvent struct {
+	ID        uint64    `json:"id" gorm:"primaryKey;autoIncrement;"`
 	Event     string    `json:"event" gorm:"not null;"`
 	CreatedAt time.Time `json:"createdAt" gorm:"not null;"`
-}
-type OrderEvents []OrderEvent
-
-func (o OrderEvents) Value() (driver.Value, error) {
-	return json.Marshal(o)
-}
-func (o *OrderEvents) Scan(value interface{}) error {
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("failed to unmarshal JSONB value")
-	}
-
-	return json.Unmarshal(bytes, &o)
+	OrderID   string    `json:"orderId"`
 }
 
 type DeliveredHistory struct {
@@ -74,7 +64,7 @@ type BuyerResponseOrderDelivered struct {
 }
 
 type Order struct {
-	ID                 string             `json:"id" gorm:"primaryKey"`
+	ID                 string             `json:"id" gorm:"primaryKey; not null"`
 	SellerID           string             `json:"sellerId" gorm:"not null;"`
 	BuyerID            string             `json:"buyerId" gorm:"not null;"`
 	GigTitle           string             `json:"gigTitle" gorm:"not null;"`
@@ -85,7 +75,7 @@ type Order struct {
 	PaymentIntentID    string             `json:"paymentIntentId" gorm:"unique; not null;"`
 	StripeClientSecret string             `json:"stripeClientSecret" gorm:"unique; not null;"`
 	DeliveredHistories []DeliveredHistory `json:"deliveredHistories" gorm:"constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
-	OrderEvents        OrderEvents        `json:"orderEvents" gorm:"type:jsonb; serializer:json;"`
+	OrderEvents        []OrderEvent       `json:"orderEvents" gorm:"constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
 	InvoiceID          string             `json:"invoiceId,omitempty"`
 	StartDate          time.Time          `json:"startDate" gorm:"not null;"`
 	Deadline           time.Time          `json:"deadline" gorm:"not null;"`
@@ -102,16 +92,16 @@ type OrderNotificationDTO struct {
 }
 
 type CreateOrderDTO struct {
-	ClientSecret       string `json:"clientSecret" validate:"required"`
 	SellerID           string `json:"sellerId" validate:"required"`
 	BuyerID            string `json:"buyerId"`
 	GigTitle           string `json:"gigTitle" validate:"required"`
-	GigDescription     string `json:"gigDescription" validate:"required"`
+	GigDescription     string `json:"gigDescription"`
 	Price              uint64 `json:"price" validate:"required"`
 	ServiceFee         uint   `json:"serviceFee"`
 	PaymentIntentID    string `json:"paymentIntentId"`
 	StripeClientSecret string `json:"stripeClientSecret"`
 	Deadline           int    `json:"deadline" validate:"required"`
+	MessageID          string `json:"messageId,omitempty"`
 }
 
 type DeadlineExtensionRequest struct {

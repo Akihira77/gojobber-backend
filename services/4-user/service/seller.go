@@ -194,11 +194,13 @@ func (ss *SellerService) FindSellerOverviewByID(ctx context.Context, buyerId, se
 		WithContext(ctx).
 		Model(&types.Seller{}).
 		Select(`
+            sellers.id,
 			sellers.full_name, 
 			buyers.email, 
 			sellers.ratings_count, 
 			sellers.rating_sum, 
-			sellers.rating_categories
+			sellers.rating_categories,
+            sellers.stripe_account_id
 		`).
 		Joins("INNER JOIN buyers ON buyers.id = sellers.buyer_id").
 		First(&seller, "sellers.id = ? OR sellers.buyer_id = ?", sellerId, buyerId)

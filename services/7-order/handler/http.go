@@ -14,11 +14,13 @@ import (
 
 	"github.com/Akihira77/gojobber/services/7-order/service"
 	"github.com/Akihira77/gojobber/services/7-order/types"
+	"github.com/Akihira77/gojobber/services/common/genproto/chat"
 	"github.com/Akihira77/gojobber/services/common/genproto/notification"
 	"github.com/Akihira77/gojobber/services/common/genproto/user"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/stripe/stripe-go/v80"
+	"github.com/stripe/stripe-go/v80/account"
 	"github.com/stripe/stripe-go/v80/paymentintent"
 	"github.com/stripe/stripe-go/v80/refund"
 	"github.com/stripe/stripe-go/v80/webhook"
@@ -32,10 +34,11 @@ type OrderHttpHandler struct {
 	validate   *validator.Validate
 }
 
-func NewOrderHttpHandler(orderSvc service.OrderServiceImpl) *OrderHttpHandler {
+func NewOrderHttpHandler(orderSvc service.OrderServiceImpl, grpcClients *GRPCClients) *OrderHttpHandler {
 	return &OrderHttpHandler{
-		orderSvc: orderSvc,
-		validate: validator.New(validator.WithRequiredStructEnabled()),
+		grpcClient: grpcClients,
+		orderSvc:   orderSvc,
+		validate:   validator.New(validator.WithRequiredStructEnabled()),
 	}
 }
 
@@ -125,12 +128,12 @@ func (oh *OrderHttpHandler) FindMyOrdersAsSeller(c *fiber.Ctx) error {
 // NOTE: SAVE ORDER DATA WHEN BUYER INTENTS TO PAY
 // AND SET PAYMENT SUCCEED WEBHOOKS FROM STRIPE TO HANDLE CHANGING ORDER STATUS ON BACKEND
 func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(c.UserContext(), 1*time.Second)
 	defer cancel()
 
 	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
 	if !ok {
-		log.Println(userInfo)
+		log.Println("CreatePaymentIntent userInfo", userInfo)
 		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
 	}
 
@@ -170,9 +173,9 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 			Enabled: stripe.Bool(true),
 		},
 		ReceiptEmail: &userInfo.Email,
-		OnBehalfOf:   stripe.String(s.StripeAccountId),
+		OnBehalfOf:   &s.StripeAccountId,
 		Metadata: map[string]string{
-			"buyer_id":     data.BuyerID,
+			"buyer_id":     userInfo.UserID,
 			"seller_id":    data.SellerID,
 			"seller_email": s.Email,
 		},
@@ -188,11 +191,85 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 	_, err = oh.orderSvc.SaveOrder(ctx, data)
 	if err != nil {
 		log.Printf("CreatePaymentIntent error:\n+%v", err)
+		go paymentintent.Cancel(pi.ID, &stripe.PaymentIntentCancelParams{
+			CancellationReason: stripe.String("Error saving order data in GoJobber Platform"),
+		})
 		return fiber.NewError(http.StatusInternalServerError, "Error while processing order")
 	}
 
+	go func() {
+		if data.MessageID == "" {
+			return
+		}
+
+		newCtx, canc := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		defer canc()
+
+		cc, err := oh.grpcClient.GetClient("CHAT_SERVICE")
+		if err != nil {
+			log.Printf("Change Offer Status Error:\n+%v", err)
+			return
+		}
+
+		chatGrpcClient := chat.NewChatServiceClient(cc)
+		_, err = chatGrpcClient.BuyerAcceptedOffer(newCtx, &chat.BuyerAcceptedOfferRequest{
+			MessageId: data.MessageID,
+		})
+		if err != nil {
+			log.Printf("Change Offer Status Error:\n+%v", err)
+			return
+		}
+	}()
+
 	return c.Status(http.StatusCreated).JSON(fiber.Map{
 		"client_secret": pi.ClientSecret,
+	})
+}
+
+func (oh *OrderHttpHandler) ConfirmPayment(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.UserContext(), 1*time.Second)
+	defer cancel()
+
+	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
+	if !ok {
+		log.Println(userInfo)
+		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
+	}
+
+	o, err := oh.orderSvc.FindOrderByPaymentIntentID(ctx, c.Params("paymentId"))
+	if err != nil {
+		log.Printf("ConfirmPayment error:\n+%v", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fiber.NewError(http.StatusNotFound, "Order is not found")
+		}
+		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
+	}
+
+	if o.BuyerID != userInfo.UserID {
+		return fiber.ErrForbidden
+	}
+
+	result, err := paymentintent.Confirm(o.PaymentIntentID, &stripe.PaymentIntentConfirmParams{
+		PaymentMethod: stripe.String("pm_card_visa"),
+		ReturnURL:     stripe.String(fmt.Sprintf("%s/orders", os.Getenv("CLIENT_URL"))),
+	})
+
+	if err != nil {
+		log.Printf("ConfirmPayment error:\n+%v", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fiber.NewError(http.StatusNotFound, "Order is not found")
+		}
+		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
+	}
+
+	o, err = oh.orderSvc.ChangeOrderStatus(ctx, *o, types.PENDING, fmt.Sprint("Buyer Has Completed Payment Process"))
+	if err != nil {
+		log.Printf("ConfirmPayment error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"result": result,
 	})
 }
 
@@ -240,7 +317,7 @@ func (oh *OrderHttpHandler) HandleStripeWebhook(c *fiber.Ctx) error {
 			notificationGrpcClient := notification.NewNotificationServiceClient(cc)
 			_, err = notificationGrpcClient.NotifySellerOrderHasBeenMade(context.TODO(), &notification.NotifySellerGotAnOrderRequest{
 				ReceiverEmail: sellerEmail,
-				Message:       fmt.Sprintf("You Recevie An Order From Buyer [%s]", o.BuyerID),
+				Message:       fmt.Sprintf("You Receive An Order From Buyer [%s]", o.BuyerID),
 				Detail: &notification.OrderDetail{
 					GigTitle:       o.GigTitle,
 					GigDescription: o.GigDescription,
@@ -366,6 +443,27 @@ func (oh *OrderHttpHandler) SellerCancellingOrder(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while finding order")
 	}
 
+	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+	if err != nil {
+		log.Printf("SellerCancellingOrder error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while finding order")
+	}
+
+	userGrpcClient := user.NewUserServiceClient(cc)
+	s, err := userGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
+		BuyerId:  userInfo.UserID,
+		SellerId: "",
+	})
+	if err != nil {
+		log.Printf("SellerCancellingOrder error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while searching seller data")
+	}
+
+	if o.SellerID != s.Id {
+		log.Printf("SellerCancellingOrder error:\n+%v", err)
+		return fiber.NewError(http.StatusForbidden, "You dont have the right permission to access this resource")
+	}
+
 	o, err = oh.orderSvc.ChangeOrderStatus(ctx, *o, types.CANCELED, fmt.Sprintf("Seller Has Canceled This Order With Reason:\n%s", data.Reason))
 	if err != nil {
 		log.Printf("SellerCancellingOrder error:\n+%v", err)
@@ -382,12 +480,6 @@ func (oh *OrderHttpHandler) SellerCancellingOrder(c *fiber.Ctx) error {
 			PaymentIntent: &o.PaymentIntentID,
 			Reason:        &data.Reason,
 		})
-		if err != nil {
-			log.Printf("SellerCancellingOrder error:\n+%v", err)
-			return
-		}
-
-		cc, err := oh.grpcClient.GetClient("USER_SERVICE")
 		if err != nil {
 			log.Printf("SellerCancellingOrder error:\n+%v", err)
 			return
@@ -602,6 +694,10 @@ func (oh *OrderHttpHandler) BuyerRefundingOrder(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while finding order")
 	}
 
+	if o.Status != types.PENDING {
+		return fiber.NewError(http.StatusForbidden, "Seller has acknowledge this Order and decide to process further. If you want to refunds please contact the related Seller")
+	}
+
 	result, err := refund.New(&stripe.RefundParams{
 		PaymentIntent: &o.PaymentIntentID,
 		Reason:        &data.Reason,
@@ -669,7 +765,6 @@ func (oh *OrderHttpHandler) BuyerRefundingOrder(c *fiber.Ctx) error {
 	}
 }
 
-// TODO: SEND EMAIL TO BUYER THAT SELLER HAS SENT THE ORDER RESULT
 func (oh *OrderHttpHandler) SellerDeliverOrder(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
 	defer cancel()
@@ -699,11 +794,109 @@ func (oh *OrderHttpHandler) SellerDeliverOrder(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "Error while saving the provided data")
 	}
 
+	//HACK: SEND EMAIL TO BUYER THAT SELLER HAS SENT ORDER PROGRESS
+	// IGNORE ERROR FROM CODE FLOW
+	go func() {
+		newCtx, canc := context.WithTimeout(c.UserContext(), 200*time.Millisecond)
+		defer canc()
+
+		cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+		if err != nil {
+			log.Printf("SellerDeliveringOrder error:\n+%v", err)
+		}
+
+		userGrpcClient := user.NewUserServiceClient(cc)
+		b, err := userGrpcClient.FindBuyer(newCtx, &user.FindBuyerRequest{
+			BuyerId: o.BuyerID,
+		})
+		if err != nil {
+			log.Printf("SellerDeliveringOrder error:\n+%v", err)
+			return
+		}
+
+		cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		if err != nil {
+			log.Printf("SellerDeliveringOrder error:\n+%v", err)
+			return
+		}
+
+		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
+		_, err = notificationGrpcClient.NotifyBuyerSellerDeliveredOrder(context.TODO(), &notification.NotifyBuyerOrderDeliveredRequest{
+			ReceiverEmail: b.Email,
+		})
+		if err != nil {
+			log.Printf("SellerDeliveringOrder error:\n+%v", err)
+			return
+		}
+	}()
+
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"order": o,
 	})
 }
 
+// TODO: REFACTORE
+func (oh *OrderHttpHandler) SellerAcknowledgeOrder(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
+	defer cancel()
+
+	o, err := oh.orderSvc.FindOrderByID(ctx, c.Params("orderId"))
+	if err != nil {
+		log.Printf("SellerAcknowledgeOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusNotFound, "Order is not found")
+	}
+
+	o, err = oh.orderSvc.ChangeOrderStatus(ctx, *o, types.PROCESS, fmt.Sprintf("Seller Has Acknowledge This Order. Order Status Change To [%s]", types.PROCESS))
+	if err != nil {
+		log.Printf("SellerAcknowledgeOrder Error:\n+%v", err)
+		return fiber.NewError(http.StatusBadRequest, "Error while saving the provided data")
+	}
+
+	//TODO: IMPLEMENT LATER
+	//HACK: SEND EMAIL TO BUYER THAT SELLER HAS ACKNOWLEDGE THIS ORDER AND START WORKING
+	// IGNORE ERROR FROM CODE FLOW
+	// go func() {
+	// 	newCtx, canc := context.WithTimeout(c.UserContext(), 200*time.Millisecond)
+	// 	defer canc()
+	//
+	// 	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+	// 	if err != nil {
+	// 		log.Printf("SellerAcknowledgeOrder error:\n+%v", err)
+	// 	}
+	//
+	// 	userGrpcClient := user.NewUserServiceClient(cc)
+	// 	b, err := userGrpcClient.FindBuyer(newCtx, &user.FindBuyerRequest{
+	// 		BuyerId: o.BuyerID,
+	// 	})
+	// 	if err != nil {
+	// 		log.Printf("SellerAcknowledgeOrder error:\n+%v", err)
+	// 		return
+	// 	}
+	//
+	// 	cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+	// 	if err != nil {
+	// 		log.Printf("SellerAcknowledgeOrder error:\n+%v", err)
+	// 		return
+	// 	}
+	//
+	// 	notificationGrpcClient := notification.NewNotificationServiceClient(cc)
+	// 	_, err = notificationGrpcClient.NotifyBuyerOrderHasAcknowledged(context.TODO(), &notification.NotifyBuyerOrderDeliveredRequest{
+	// 		ReceiverEmail: b.Email,
+	//            OrderDetail:,
+	//            Seller:,
+	// 	})
+	// 	if err != nil {
+	// 		log.Printf("SellerAcknowledgeOrder error:\n+%v", err)
+	// 		return
+	// 	}
+	// }()
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"order": o,
+	})
+}
+
+// TODO: SEND EMAIL TO SELLER THAT BUYER RESPONSE THEIR DELIVERED ORDER
 func (oh *OrderHttpHandler) BuyerResponseForDeliveredOrder(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
 	defer cancel()
@@ -756,5 +949,47 @@ func (oh *OrderHttpHandler) FindMyOrdersNotifications(c *fiber.Ctx) error {
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"orders": orders,
+	})
+}
+
+func (oh *OrderHttpHandler) StripeTOSAcceptance(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.UserContext(), 500*time.Millisecond)
+	defer cancel()
+
+	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
+	if !ok {
+		log.Println(userInfo)
+		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
+	}
+
+	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+	if err != nil {
+		log.Printf("StripeTOSAcceptance error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
+	}
+
+	userGrpcClient := user.NewUserServiceClient(cc)
+	s, err := userGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
+		BuyerId:  userInfo.UserID,
+		SellerId: "",
+	})
+	if err != nil {
+		log.Printf("StripeTOSAcceptance error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while finding seller")
+	}
+
+	result, err := account.Update(s.StripeAccountId, &stripe.AccountParams{
+		TOSAcceptance: &stripe.AccountTOSAcceptanceParams{
+			Date: stripe.Int64(time.Now().Unix()),
+			IP:   stripe.String(c.IP()),
+		},
+	})
+	if err != nil {
+		log.Printf("StripeTOSAcceptance error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while finding seller")
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"result": result,
 	})
 }

@@ -2,6 +2,8 @@ package types
 
 import (
 	"database/sql/driver"
+	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"time"
 
@@ -9,29 +11,49 @@ import (
 	"gorm.io/gorm"
 )
 
-type offerStatus string
+type OfferStatus string
 
 const (
-	PENDING  offerStatus = "PENDING"
-	CANCELED offerStatus = "CANCELED"
-	ACCEPTED offerStatus = "ACCEPTED"
+	PENDING  OfferStatus = "PENDING"
+	CANCELED OfferStatus = "CANCELED"
+	ACCEPTED OfferStatus = "ACCEPTED"
 )
 
-func (p *offerStatus) Scan(value interface{}) error {
-	*p = offerStatus(value.([]byte))
+func (p *OfferStatus) Scan(value interface{}) error {
+	*p = OfferStatus(value.([]byte))
 	return nil
 }
 
-func (p offerStatus) Value() (driver.Value, error) {
+func (p OfferStatus) Value() (driver.Value, error) {
 	return string(p), nil
 }
 
 type Offer struct {
 	GigTitle             string      `json:"gigTitle" form:"gigTitle" validate:"required"`
 	Price                uint        `json:"price" form:"price" validate:"required"`
-	ExpectedDeliveryDays uint        `json:"expectedDeliveryDays" form:"expectedDeliveryDays"`
+	ExpectedDeliveryDays uint        `json:"expectedDeliveryDays" form:"expectedDeliveryDays" validate:"required"`
 	Description          string      `json:"description" form:"description"`
-	Status               offerStatus `json:"status" gorm:"not null; type:offer_status; default:'PENDING';"`
+	Status               OfferStatus `json:"status" gorm:"not null;"`
+	CreatedAt            time.Time   `json:"createdAt" gorm:"not null;"`
+}
+
+func (o *Offer) Scan(value interface{}) error {
+	if value == nil {
+		*o = Offer{}
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("could not scan type %T into Offer", value)
+	}
+	return json.Unmarshal(bytes, &o)
+}
+
+func (o *Offer) Value() (driver.Value, error) {
+	if o == nil {
+		return nil, nil
+	}
+	return json.Marshal(o)
 }
 
 type Message struct {
@@ -66,13 +88,12 @@ type UserMessage struct {
 }
 
 type CreateMessageDTO struct {
-	// SenderID      string         `json:"senderId"`
 	ReceiverID    string         `json:"receiverId" form:"receiverId" validate:"required"`
-	ReceiverEmail string         `json:"receiverEmail" form:"receiverEmail" validate:"required,email"`
+	ReceiverEmail string         `json:"receiverEmail" validate:"required,email"`
 	Body          string         `json:"body" form:"body"`
 	File          multipart.File `json:"file" form:"file"`
 	FileURL       string         `json:"fileUrl"`
-	Offer         *Offer         `json:"offer" form:"offer"`
+	Offer         *Offer         `json:"offer,omitempty" form:"offer"`
 }
 
 type Conversation struct {

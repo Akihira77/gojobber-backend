@@ -78,6 +78,10 @@ message NotifySellerGotAReviewRequest {
     string message = 2;
 }
 
+message NotifyBuyerOrderDeliveredRequest {
+    string receiverEmail = 1;
+}
+
 service NotificationService {
     // From Auth Service
     rpc UserVerifyingEmail(VerifyingEmailRequest) returns (google.protobuf.Empty) {}
@@ -96,4 +100,5 @@ service NotificationService {
     rpc BuyerRefundsAnOrder(BuyerRefundsOrderRequest) returns (google.protobuf.Empty) {}
     rpc NotifySellerOrderHasBeenMade(NotifySellerGotAnOrderRequest) returns (google.protobuf.Empty) {}
     rpc NotifySellerGotAReview(NotifySellerGotAReviewRequest) returns (google.protobuf.Empty) {}
+    rpc NotifyBuyerSellerDeliveredOrder(NotifyBuyerOrderDeliveredRequest) returns (google.protobuf.Empty) {}
 }

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option go_package="github.com/Akihira77/common/chat";
+import "google/protobuf/empty.proto";
+
+message BuyerAcceptedOfferRequest {
+    string messageId = 1;
+}
+
+service ChatService {
+    rpc BuyerAcceptedOffer(BuyerAcceptedOfferRequest) returns (google.protobuf.Empty) {}
+}

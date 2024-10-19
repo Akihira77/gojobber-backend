@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -32,6 +33,7 @@ func sendHttpReqToAnotherService(c *fiber.Ctx, url string) (int, []byte, []error
 	}
 
 	if err := a.Parse(); err != nil {
+		log.Printf("send http request to another service error:\n+%v", err)
 		panic(err)
 	}
 

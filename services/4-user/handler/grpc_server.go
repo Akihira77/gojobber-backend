@@ -78,6 +78,7 @@ func (h *UserGRPCHandler) FindSeller(ctx context.Context, req *user.FindSellerRe
 	}
 
 	return &user.FindSellerResponse{
+		Id:           s.ID,
 		FullName:     s.FullName,
 		Email:        s.Email,
 		RatingsCount: int64(s.RatingsCount),
@@ -89,6 +90,7 @@ func (h *UserGRPCHandler) FindSeller(ctx context.Context, req *user.FindSellerRe
 			Four:  int32(s.RatingCategories.Four),
 			Five:  int32(s.RatingCategories.Five),
 		},
+		StripeAccountId: s.StripeAccountID,
 	}, nil
 }
 

@@ -32,7 +32,7 @@ func (gh *GigHandler) HealthCheck(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) FindGigByID(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/id/%s", c.Params("id"))
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/id/%s", c.Params("id"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - find gig by id error", errs)
@@ -45,7 +45,7 @@ func (gh *GigHandler) FindGigByID(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) FindSellerActiveGigs(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/seller/%s/%s/%s", c.Params("sellerId"), c.Params("page"), c.Params("size"))
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/sellers/active/%s/%s", c.Params("page"), c.Params("size"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - find seller active gigs error", errs)
@@ -58,7 +58,7 @@ func (gh *GigHandler) FindSellerActiveGigs(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) FindSellerInactiveGigs(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/seller/inactive/%s/%s/%s", c.Params("sellerId"), c.Params("page"), c.Params("size"))
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/sellers/inactive/%s/%s", c.Params("page"), c.Params("size"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - find seller inactive gigs error", errs)
@@ -71,7 +71,7 @@ func (gh *GigHandler) FindSellerInactiveGigs(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) FindGigsByCategory(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/category/%s/%s/%s", c.Params("category"), c.Params("page"), c.Params("size"))
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/category/%s/%s/%s", c.Params("category"), c.Params("page"), c.Params("size"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - find gigs by category error", errs)
@@ -84,7 +84,7 @@ func (gh *GigHandler) FindGigsByCategory(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) GetPopularGigs(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/popular/category/%s", c.Params("category"))
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/popular")
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - get popular gigs by category error", errs)
@@ -97,7 +97,7 @@ func (gh *GigHandler) GetPopularGigs(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) FindSimilarGigs(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/similar/%s/%s/%s", c.Params("gigId"), c.Params("page"), c.Params("size"))
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/similar/%s/%s/%s", c.Params("gigId"), c.Params("page"), c.Params("size"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - find similar gigs error", errs)
@@ -111,7 +111,7 @@ func (gh *GigHandler) FindSimilarGigs(c *fiber.Ctx) error {
 
 func (gh *GigHandler) GigQuerySearch(c *fiber.Ctx) error {
 	query := fmt.Sprintf("query=%v&max=%v&delivery_time=%v", c.Query("query"), c.QueryInt("max"), c.QueryInt("delivery_time"))
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/search/%s/%s?%s", c.Params("page"), c.Params("size"), query)
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/search/%s/%s?%s", c.Params("page"), c.Params("size"), query)
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - get gigs by query error", errs)
@@ -124,7 +124,7 @@ func (gh *GigHandler) GigQuerySearch(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) CreateGig(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig")
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs")
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - creating gig error", errs)
@@ -137,7 +137,7 @@ func (gh *GigHandler) CreateGig(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) UpdateGig(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/%s/%s", c.Params("sellerId"), c.Params("gigId"))
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/%s/%s", c.Params("sellerId"), c.Params("gigId"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - updating gig error", errs)
@@ -150,7 +150,7 @@ func (gh *GigHandler) UpdateGig(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) ActivateGigStatus(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/update-status/%s/%s", c.Params("sellerId"), c.Params("gigId"))
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/update-status/%s/%s", c.Params("sellerId"), c.Params("gigId"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - activate gig status error", errs)
@@ -163,7 +163,7 @@ func (gh *GigHandler) ActivateGigStatus(c *fiber.Ctx) error {
 }
 
 func (gh *GigHandler) DeactivateGigStatus(c *fiber.Ctx) error {
-	route := gh.base_url + fmt.Sprintf("/api/v1/gig/%s/%s", c.Params("sellerId"), c.Params("gigId"))
+	route := gh.base_url + fmt.Sprintf("/api/v1/gigs/%s/%s", c.Params("sellerId"), c.Params("gigId"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("GIG - deactivate gig status error", errs)

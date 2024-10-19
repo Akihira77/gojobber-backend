@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -22,7 +23,7 @@ type OrderServiceImpl interface {
 	FindOrdersByBuyerID(ctx context.Context, id string) ([]types.Order, error)
 	FindOrdersBySellerID(ctx context.Context, id string) ([]types.Order, error)
 	SaveOrder(ctx context.Context, data *types.CreateOrderDTO) (*types.Order, error)
-	ChangeOrderStatus(ctx context.Context, o types.Order, newStatus types.OrderStatus, reason string) (*types.Order, error)
+	ChangeOrderStatus(ctx context.Context, o types.Order, newStatus types.OrderStatus, msg string) (*types.Order, error)
 	RequestDeadlineExtension(ctx context.Context, o types.Order, data *types.DeadlineExtensionRequest) error
 	DeadlineExtensionResponse(ctx context.Context, o types.Order, status types.DeadlineExtensionStatus, data *types.DeadlineExtensionRequest) (string, error)
 	DeliveringOrder(ctx context.Context, o types.Order, dh types.DeliveredHistory) (*types.Order, error)
@@ -37,30 +38,48 @@ func NewOrderService(db *gorm.DB) OrderServiceImpl {
 	}
 }
 
-func (os *OrderService) ChangeOrderStatus(ctx context.Context, o types.Order, newStatus types.OrderStatus, reason string) (*types.Order, error) {
-	o.Status = newStatus
-	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
-		Event:     reason,
-		CreatedAt: time.Now(),
-	})
+func (os *OrderService) ChangeOrderStatus(ctx context.Context, o types.Order, newStatus types.OrderStatus, msg string) (*types.Order, error) {
+	tx := os.db.
+		Debug().
+		WithContext(ctx).
+		Begin()
 
+	o.Status = newStatus
 	result := os.db.
 		Debug().
 		WithContext(ctx).
 		Save(&o)
+	if result.Error != nil {
+		tx.Rollback()
+		return nil, result.Error
+	}
+
+	result = tx.
+		Model(&types.OrderEvent{}).
+		Create(&types.OrderEvent{
+			OrderID:   o.ID,
+			Event:     msg,
+			CreatedAt: time.Now(),
+		})
+	if result.Error != nil {
+		tx.Rollback()
+		return nil, result.Error
+	}
+
+	result = tx.Commit()
 
 	return &o, result.Error
 }
 
 func (os *OrderService) SaveOrder(ctx context.Context, data *types.CreateOrderDTO) (*types.Order, error) {
-	var orderEvents types.OrderEvents
-	orderEvents = append(orderEvents, types.OrderEvent{
-		Event:     fmt.Sprintf("Buyer Has Purchased Your Gig With PaymentID: %s", data.PaymentIntentID),
-		CreatedAt: time.Now(),
-	})
+	tx := os.db.
+		Debug().
+		WithContext(ctx).
+		Begin()
 
 	startDate := time.Now()
 	newOrder := types.Order{
+		ID:                 fmt.Sprintf("JO%s", util.RandomStr(30)),
 		SellerID:           data.SellerID,
 		BuyerID:            data.BuyerID,
 		GigTitle:           data.GigTitle,
@@ -73,15 +92,29 @@ func (os *OrderService) SaveOrder(ctx context.Context, data *types.CreateOrderDT
 		StartDate:          startDate,
 		Deadline:           startDate.AddDate(0, 0, data.Deadline),
 		InvoiceID:          fmt.Sprintf("JI%s", util.RandomStr(30)),
-		OrderEvents:        orderEvents,
-		DeliveredHistories: []types.DeliveredHistory{},
 	}
 
-	result := os.db.
-		Debug().
-		WithContext(ctx).
+	result := tx.
 		Model(&types.Order{}).
 		Create(&newOrder)
+	if result.Error != nil {
+		tx.Rollback()
+		return nil, result.Error
+	}
+
+	result = tx.
+		Model(&types.OrderEvent{}).
+		Create(&types.OrderEvent{
+			OrderID:   newOrder.ID,
+			Event:     fmt.Sprintf("Buyer Has Purchased Your Gig With PaymentID: %s", data.PaymentIntentID),
+			CreatedAt: time.Now(),
+		})
+	if result.Error != nil {
+		tx.Rollback()
+		return nil, result.Error
+	}
+
+	result = tx.Commit()
 
 	return &newOrder, result.Error
 }
@@ -103,10 +136,18 @@ func (os *OrderService) OrderDeliveredResponse(ctx context.Context, o types.Orde
 		return &o, result.Error
 	}
 
-	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
-		Event:     fmt.Sprintf("Buyer Responded Your Order Delivered Progress"),
-		CreatedAt: time.Now(),
-	})
+	result = tx.
+		Model(&types.OrderEvent{}).
+		Create(&types.OrderEvent{
+			OrderID:   o.ID,
+			Event:     fmt.Sprintf("Buyer Responded Your Order Delivered Progress"),
+			CreatedAt: time.Now(),
+		})
+	if result.Error != nil {
+		tx.Rollback()
+		return &o, result.Error
+	}
+
 	result = tx.Save(&o)
 	if result.Error != nil {
 		tx.Rollback()
@@ -145,10 +186,18 @@ func (os *OrderService) DeliveringOrder(ctx context.Context, o types.Order, dh t
 		return &o, result.Error
 	}
 
-	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
-		Event:     fmt.Sprintf("Seller Delivering The Order"),
-		CreatedAt: time.Now(),
-	})
+	result = tx.
+		Model(&types.OrderEvent{}).
+		Create(&types.OrderEvent{
+			OrderID:   o.ID,
+			Event:     fmt.Sprintf("Seller Delivering The Order"),
+			CreatedAt: time.Now(),
+		})
+	if result.Error != nil {
+		tx.Rollback()
+		return &o, result.Error
+	}
+
 	result = tx.Save(&o)
 	if result.Error != nil {
 		tx.Rollback()
@@ -171,47 +220,84 @@ func (os *OrderService) DeliveringOrder(ctx context.Context, o types.Order, dh t
 }
 
 func (os *OrderService) RequestDeadlineExtension(ctx context.Context, o types.Order, data *types.DeadlineExtensionRequest) error {
-	deadline := o.Deadline.Add(time.Duration(data.NumberOfDays))
-	o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
-		Event:     fmt.Sprintf("Seller Requesting To Extend The Deadline To Become [%v] With Reason:\n%s", deadline, data.Reason),
-		CreatedAt: time.Now(),
-	})
+	tx := os.db.
+		Debug().
+		WithContext(ctx).
+		Begin()
 
-	result := os.db.
+	deadline := o.Deadline.Add(time.Duration(data.NumberOfDays))
+	result := tx.
+		Model(&types.OrderEvent{}).
+		Create(&types.OrderEvent{
+			OrderID:   o.ID,
+			Event:     fmt.Sprintf("Seller Requesting To Extend The Deadline To Become [%v] With Reason:\n%s", deadline, data.Reason),
+			CreatedAt: time.Now(),
+		})
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	result = os.db.
 		Debug().
 		WithContext(ctx).
 		Save(&o)
+	if result.Error != nil {
+		tx.Rollback()
+		return result.Error
+	}
+
+	result = tx.Commit()
 
 	return result.Error
 }
 
 func (os *OrderService) DeadlineExtensionResponse(ctx context.Context, o types.Order, status types.DeadlineExtensionStatus, data *types.DeadlineExtensionRequest) (string, error) {
+	tx := os.db.
+		Debug().
+		WithContext(ctx).
+		Begin()
+
 	switch status {
 	case types.ACCEPTED:
-		msg := fmt.Sprintf("Buyer Accepted Seller Order Deadline Extension From [%v] To [%v]", o.Deadline, o.Deadline.Add(time.Duration(data.NumberOfDays)))
-		o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
-			Event:     msg,
-			CreatedAt: time.Now(),
-		})
 		o.Deadline = o.Deadline.Add(time.Duration(data.NumberOfDays))
+		result := tx.Save(&o)
+		if result.Error != nil {
+			tx.Rollback()
+			return "", result.Error
+		}
 
-		result := os.db.
-			Debug().
-			WithContext(ctx).
-			Save(&o)
+		msg := fmt.Sprintf("Buyer Accepted Seller Order Deadline Extension From [%v] To [%v]", o.Deadline, o.Deadline.Add(time.Duration(data.NumberOfDays)))
+		result = tx.
+			Model(&types.OrderEvent{}).
+			Create(&types.OrderEvent{
+				OrderID:   o.ID,
+				Event:     msg,
+				CreatedAt: time.Now(),
+			})
+		if result.Error != nil {
+			tx.Rollback()
+			return "", result.Error
+		}
+
+		result = tx.Commit()
 
 		return msg, result.Error
 	case types.REJECTED:
 		msg := fmt.Sprintf("Buyer Rejected Your Order Deadline Extension With Reason:\n%s", data.Reason)
-		o.OrderEvents = append(o.OrderEvents, types.OrderEvent{
-			Event:     msg,
-			CreatedAt: time.Now(),
-		})
+		result := tx.
+			Model(&types.OrderEvent{}).
+			Create(&types.OrderEvent{
+				OrderID:   o.ID,
+				Event:     msg,
+				CreatedAt: time.Now(),
+			})
+		if result.Error != nil {
+			tx.Rollback()
+			return "", result.Error
+		}
 
-		result := os.db.
-			Debug().
-			WithContext(ctx).
-			Save(&o)
+		result = tx.Commit()
 
 		return msg, result.Error
 	default:
@@ -262,9 +348,11 @@ func (os *OrderService) FindOrderByPaymentIntentID(ctx context.Context, id strin
 		WithContext(ctx).
 		Model(&types.Order{}).
 		Preload("DeliveredHistories").
+		Preload("OrderEvents").
 		Where("payment_intent_id = ?", id).
 		First(&o)
 
+	log.Println(o)
 	return &o, result.Error
 }
 

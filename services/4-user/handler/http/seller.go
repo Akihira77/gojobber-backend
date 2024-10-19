@@ -12,6 +12,7 @@ import (
 
 	svc "github.com/Akihira77/gojobber/services/4-user/service"
 	"github.com/Akihira77/gojobber/services/4-user/types"
+	"github.com/Akihira77/gojobber/services/4-user/util"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/stripe/stripe-go/v80"
@@ -140,13 +141,28 @@ func (sh *SellerHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusNotFound, "data does not found in buyer database")
 	}
 
+	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 	acctParams := &stripe.AccountParams{
-		Country:      &sellerDataInBuyerDB.Country,
+		Country:      stripe.String(util.FindMyCountryCode(sellerDataInBuyerDB.Country)),
 		Email:        &sellerDataInBuyerDB.Email,
 		BusinessType: stripe.String(string(stripe.AccountBusinessTypeIndividual)),
 		Controller: &stripe.AccountControllerParams{
+			StripeDashboard: &stripe.AccountControllerStripeDashboardParams{
+				Type: stripe.String("none"),
+			},
 			Fees: &stripe.AccountControllerFeesParams{
-				Payer: stripe.String(string(stripe.AccountControllerFeesPayerAccount)),
+				Payer: stripe.String("application"),
+			},
+			Losses: &stripe.AccountControllerLossesParams{
+				Payments: stripe.String("application"),
+			},
+			RequirementCollection: stripe.String("application"),
+		}, Capabilities: &stripe.AccountCapabilitiesParams{
+			CardPayments: &stripe.AccountCapabilitiesCardPaymentsParams{
+				Requested: stripe.Bool(true),
+			},
+			Transfers: &stripe.AccountCapabilitiesTransfersParams{
+				Requested: stripe.Bool(true),
 			},
 		},
 	}

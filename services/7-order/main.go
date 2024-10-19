@@ -20,24 +20,27 @@ func main() {
 	// db.Debug().Migrator().DropTable(
 	// 	types.DeliveredHistory{},
 	// 	types.Order{},
+	// 	types.OrderEvent{},
 	// )
 	// db.Debug().AutoMigrate(
 	// 	types.DeliveredHistory{},
 	// 	types.Order{},
+	// 	types.OrderEvent{},
 	// )
 	// err = types.ApplyDBSetup(db)
 	// if err != nil {
 	// 	log.Fatalf("Error applying DB setup %v", err)
 	// }
 
+	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 	cld := util.NewCloudinary()
 
 	ccs := handler.NewGRPCClients()
 	ccs.AddClient("USER_SERVICE", os.Getenv("USER_GRPC_PORT"))
 	ccs.AddClient("NOTIFICATION_SERVICE", os.Getenv("NOTIFICATION_GRPC_PORT"))
-	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
+	ccs.AddClient("CHAT_SERVICE", os.Getenv("CHAT_GRPC_PORT"))
 
-	go NewHttpServer(db, cld)
+	go NewHttpServer(db, cld, ccs)
 
 	grpcServer := NewGRPCServer(os.Getenv("ORDER_GRPC_PORT"))
 	err = grpcServer.Run(db)
