@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Akihira77/gojobber/services/8-review/handler"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -13,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewHttpServer(db *gorm.DB) {
+func NewHttpServer(db *gorm.DB, ccs *handler.GRPCClients) {
 	port := os.Getenv("PORT")
 	app := fiber.New(fiber.Config{
 		BodyLimit:     5 * 1024 * 1024,
@@ -32,7 +33,7 @@ func NewHttpServer(db *gorm.DB) {
 	app.Use(helmet.New())
 	app.Use(logger.New())
 
-	MainRouter(db, app)
+	MainRouter(db, app, ccs)
 	if err := app.Listen(port); err != nil {
 		log.Fatalf("Failed listening to localhost%s", port)
 	}

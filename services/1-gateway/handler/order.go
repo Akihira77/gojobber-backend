@@ -187,6 +187,19 @@ func (oh *OrderHandler) OrderRefund(c *fiber.Ctx) error {
 	return c.Status(statusCode).Send(body)
 }
 
+func (oh *OrderHandler) AcknowledgeOrder(c *fiber.Ctx) error {
+	route := oh.base_url + fmt.Sprintf("/api/v1/orders/%s/acknowledge", c.Params("orderId"))
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("Acknowledging Order Error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
 func (oh *OrderHandler) BuyerResponseForDeliveredOrder(c *fiber.Ctx) error {
 	route := oh.base_url + fmt.Sprintf("/api/v1/orders/deliver/%s/response", c.Params("orderId"))
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)

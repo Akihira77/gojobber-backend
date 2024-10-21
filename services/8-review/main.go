@@ -39,5 +39,5 @@ func main() {
 	ccs.AddClient("USER_SERVICE", os.Getenv("USER_GRPC_PORT"))
 	ccs.AddClient("NOTIFICATION_SERVICE", os.Getenv("NOTIFICATION_GRPC_PORT"))
 
-	NewHttpServer(db)
+	NewHttpServer(db, ccs)
 }

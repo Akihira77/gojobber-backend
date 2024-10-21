@@ -41,9 +41,7 @@ func (rh *ReviewHandler) FindSellerReviews(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(statusCode).JSON(fiber.Map{
-		"response": string(body),
-	})
+	return c.Status(statusCode).Send(body)
 }
 
 func (rh *ReviewHandler) Add(c *fiber.Ctx) error {
@@ -56,9 +54,7 @@ func (rh *ReviewHandler) Add(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(statusCode).JSON(fiber.Map{
-		"response": string(body),
-	})
+	return c.Status(statusCode).Send(body)
 }
 
 func (rh *ReviewHandler) Update(c *fiber.Ctx) error {
@@ -71,9 +67,7 @@ func (rh *ReviewHandler) Update(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(statusCode).JSON(fiber.Map{
-		"response": string(body),
-	})
+	return c.Status(statusCode).Send(body)
 }
 
 func (rh *ReviewHandler) Remove(c *fiber.Ctx) error {
@@ -86,7 +80,5 @@ func (rh *ReviewHandler) Remove(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(statusCode).JSON(fiber.Map{
-		"response": string(body),
-	})
+	return c.Status(statusCode).Send(body)
 }

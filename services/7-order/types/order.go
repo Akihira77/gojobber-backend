@@ -2,7 +2,6 @@ package types
 
 import (
 	"database/sql/driver"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,12 +28,12 @@ const (
 
 func (p *OrderStatus) Scan(value interface{}) error {
 	*p = OrderStatus(value.(string))
-	log.Println("scan p", p)
+	// log.Println("scan p", p)
 	return nil
 }
 
 func (p OrderStatus) Value() (driver.Value, error) {
-	log.Println("value p", p)
+	// log.Println("value p", p)
 	return string(p), nil
 }
 
@@ -74,8 +73,8 @@ type Order struct {
 	ServiceFee         uint               `json:"serviceFee" gorm:"not null; default:0;"`
 	PaymentIntentID    string             `json:"paymentIntentId" gorm:"unique; not null;"`
 	StripeClientSecret string             `json:"stripeClientSecret" gorm:"unique; not null;"`
-	DeliveredHistories []DeliveredHistory `json:"deliveredHistories" gorm:"constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
-	OrderEvents        []OrderEvent       `json:"orderEvents" gorm:"constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
+	DeliveredHistories []DeliveredHistory `json:"deliveredHistories,omitempty" gorm:"constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
+	OrderEvents        []OrderEvent       `json:"orderEvents,omitempty" gorm:"constraint:OnUpdate:CASCADE,OnDelete:RESTRICT"`
 	InvoiceID          string             `json:"invoiceId,omitempty"`
 	StartDate          time.Time          `json:"startDate" gorm:"not null;"`
 	Deadline           time.Time          `json:"deadline" gorm:"not null;"`
@@ -105,8 +104,9 @@ type CreateOrderDTO struct {
 }
 
 type DeadlineExtensionRequest struct {
-	NumberOfDays int    `json:"numberOfDays" validate:"required,gte=1,lte=365"`
-	Reason       string `json:"reason" validate:"required"`
+	NumberOfDays  int                     `json:"numberOfDays" validate:"required,gte=1,lte=365"`
+	Reason        string                  `json:"reason" validate:"required"`
+	BuyerResponse DeadlineExtensionStatus `json:"buyerResponse"`
 }
 
 func ApplyDBSetup(db *gorm.DB) error {

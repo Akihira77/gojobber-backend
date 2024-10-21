@@ -20,18 +20,18 @@ import (
 )
 
 type ChatHandler struct {
-	cs           service.ChatServiceImpl
-	validate     *validator.Validate
-	cld          *util.Cloudinary
-	grpcServices *GRPCClients
+	cs         service.ChatServiceImpl
+	validate   *validator.Validate
+	cld        *util.Cloudinary
+	grpcClient *GRPCClients
 }
 
 func NewChatHandler(cld *util.Cloudinary, cs service.ChatServiceImpl, grpcServices *GRPCClients) *ChatHandler {
 	return &ChatHandler{
-		cs:           cs,
-		validate:     validator.New(validator.WithRequiredStructEnabled()),
-		cld:          cld,
-		grpcServices: grpcServices,
+		cs:         cs,
+		validate:   validator.New(validator.WithRequiredStructEnabled()),
+		cld:        cld,
+		grpcClient: grpcServices,
 	}
 }
 
@@ -55,7 +55,7 @@ func (ch *ChatHandler) GetAllMyConversations(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching conversations data")
 	}
 
-	cc, err := ch.grpcServices.GetClient("USER_SERVICE")
+	cc, err := ch.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		fmt.Printf("Get All My Conversations Error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching conversations data")
@@ -148,7 +148,7 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "Error reading request body")
 	}
 
-	cc, err := ch.grpcServices.GetClient("USER_SERVICE")
+	cc, err := ch.grpcClient.GetClient("USER_SERVICE")
 	userGrpcClient := user.NewUserServiceClient(cc)
 	if err != nil {
 		fmt.Printf("InsertMessage Error:\n%+v", err)
@@ -214,7 +214,7 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 			return
 		}
 
-		cc, err = ch.grpcServices.GetClient("NOTIFICATION_SERVICE")
+		cc, err = ch.grpcClient.GetClient("NOTIFICATION_SERVICE")
 		if err != nil {
 			fmt.Printf("InsertMessage Error:\n+%v", err)
 			return

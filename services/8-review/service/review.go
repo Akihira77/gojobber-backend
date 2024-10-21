@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/Akihira77/gojobber/services/8-review/types"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ReviewService struct {
@@ -14,7 +16,7 @@ type ReviewService struct {
 
 type ReviewServiceImpl interface {
 	FindSellerReviews(ctx context.Context, sellerID string) ([]types.Review, error)
-	FindReviewByID(ctx context.Context, id string) (*types.Review, error)
+	FindReviewByID(ctx context.Context, id uuid.UUID) (*types.Review, error)
 	Add(ctx context.Context, data types.UpsertReviewDTO) (*types.Review, error)
 	Update(ctx context.Context, data types.Review) (*types.Review, error)
 	Remove(ctx context.Context, reviewID string) error
@@ -39,7 +41,7 @@ func (rs *ReviewService) FindSellerReviews(ctx context.Context, sellerID string)
 	return rvs, result.Error
 }
 
-func (rs *ReviewService) FindReviewByID(ctx context.Context, id string) (*types.Review, error) {
+func (rs *ReviewService) FindReviewByID(ctx context.Context, id uuid.UUID) (*types.Review, error) {
 	var r types.Review
 
 	result := rs.db.
@@ -84,8 +86,9 @@ func (rs *ReviewService) Update(ctx context.Context, data types.Review) (*types.
 	result := rs.db.
 		Debug().
 		WithContext(ctx).
-		Model(&types.Review{}).
-		Create(&data)
+		Model(&data).
+		Clauses(clause.Returning{}).
+		Updates(types.Review{Rating: data.Rating, Review: data.Review})
 
 	return &data, result.Error
 }

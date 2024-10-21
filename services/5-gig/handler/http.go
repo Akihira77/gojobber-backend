@@ -19,18 +19,18 @@ import (
 )
 
 type GigHandler struct {
-	gigSvc       service.GigServiceImpl
-	validate     *validator.Validate
-	cld          *util.Cloudinary
-	grpcServices *GRPCClients
+	gigSvc     service.GigServiceImpl
+	validate   *validator.Validate
+	cld        *util.Cloudinary
+	grpcClient *GRPCClients
 }
 
 func NewGigHandler(gigSvc service.GigServiceImpl, cld *util.Cloudinary, grpcServices *GRPCClients) *GigHandler {
 	return &GigHandler{
-		gigSvc:       gigSvc,
-		validate:     validator.New(validator.WithRequiredStructEnabled()),
-		cld:          cld,
-		grpcServices: grpcServices,
+		gigSvc:     gigSvc,
+		validate:   validator.New(validator.WithRequiredStructEnabled()),
+		cld:        cld,
+		grpcClient: grpcServices,
 	}
 }
 
@@ -47,7 +47,7 @@ func (gh *GigHandler) FindGigByID(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
@@ -104,9 +104,9 @@ func (gh *GigHandler) GigQuerySearch(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "searching error")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
-		log.Printf("gig query search", err)
+		log.Printf("gig query search:\n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while validating seller")
 	}
 	userGrpcClient := user.NewUserServiceClient(cc)
@@ -142,7 +142,7 @@ func (gh *GigHandler) FindSellerGigs(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "searching error")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		log.Printf("FindSellerGigs Error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while validating seller")
@@ -192,7 +192,7 @@ func (gh *GigHandler) FindSellerInactiveGigs(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		log.Println("find seller inactive gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
@@ -228,7 +228,7 @@ func (gh *GigHandler) FindGigByCategory(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		log.Println("find gig by category", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
@@ -270,7 +270,7 @@ func (gh *GigHandler) FindSimilarGigs(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		log.Println("find similar gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
@@ -299,7 +299,7 @@ func (gh *GigHandler) GetPopularGigs(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		log.Println("get popular gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
@@ -335,7 +335,7 @@ func (gh *GigHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while parsing body")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}

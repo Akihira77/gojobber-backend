@@ -14,20 +14,21 @@ import (
 	"github.com/Akihira77/gojobber/services/common/genproto/user"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type ReviewHandler struct {
-	reviewSvc    service.ReviewServiceImpl
-	validate     *validator.Validate
-	grpcServices *GRPCClients
+	reviewSvc  service.ReviewServiceImpl
+	validate   *validator.Validate
+	grpcClient *GRPCClients
 }
 
-func NewReviewHandler(reviewSvc service.ReviewServiceImpl) *ReviewHandler {
+func NewReviewHandler(reviewSvc service.ReviewServiceImpl, grpcClients *GRPCClients) *ReviewHandler {
 	return &ReviewHandler{
-		reviewSvc:    reviewSvc,
-		validate:     validator.New(validator.WithRequiredStructEnabled()),
-		grpcServices: NewGRPCClients(),
+		reviewSvc:  reviewSvc,
+		validate:   validator.New(validator.WithRequiredStructEnabled()),
+		grpcClient: grpcClients,
 	}
 }
 
@@ -37,8 +38,8 @@ func (rh *ReviewHandler) FindSellerReviews(c *fiber.Ctx) error {
 
 	reviews, err := rh.reviewSvc.FindSellerReviews(ctx, c.Params("sellerId"))
 	if err != nil {
-		log.Printf("FindSellerReviews Error:\n+%v", err)
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+		log.Printf("FindSellerReviews Error:\n%+v", err)
+		return c.Status(http.StatusOK).JSON(fiber.Map{
 			"reviews": []types.Review{},
 		})
 	}
@@ -61,20 +62,21 @@ func (rh *ReviewHandler) Add(c *fiber.Ctx) error {
 	data := new(types.UpsertReviewDTO)
 	err := c.BodyParser(data)
 	if err != nil {
-		log.Printf("Add Review Error:\n+%v", err)
+		log.Printf("Add Review Error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "Invalid Data")
 	}
 
+	data.BuyerID = userInfo.UserID
 	err = rh.validate.Struct(data)
 	if err != nil {
-		log.Printf("Add Review Error:\n+%v", err)
+		log.Printf("Add Review Error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "Invalid Data")
 	}
 
-	cc, err := rh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := rh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
-		log.Printf("Add Review Error:\n+%v", err)
-		return fiber.NewError(http.StatusNotFound, "Error while validating seller")
+		log.Printf("Add Review Error:\n%+v", err)
+		return fiber.NewError(http.StatusBadRequest, "Error while validating seller")
 	}
 
 	userGrpcClient := user.NewUserServiceClient(cc)
@@ -82,20 +84,20 @@ func (rh *ReviewHandler) Add(c *fiber.Ctx) error {
 		SellerId: data.SellerID,
 	})
 	if err != nil {
-		log.Printf("Add Review Error:\n+%v", err)
-		return fiber.NewError(http.StatusNotFound, "Error while validating seller")
+		log.Printf("Add Review Error:\n%+v", err)
+		return fiber.NewError(http.StatusBadRequest, "Error while validating seller")
 	}
 
 	r, err := rh.reviewSvc.Add(ctx, *data)
 	if err != nil {
-		log.Printf("Add Review Error:\n+%v", err)
+		log.Printf("Add Review Error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "Error while saving review")
 	}
 
 	go func() {
-		cc, err := rh.grpcServices.GetClient("NOTIFICATION_SERVICE")
+		cc, err := rh.grpcClient.GetClient("NOTIFICATION_SERVICE")
 		if err != nil {
-			log.Printf("Add Review Error:\n+%v", err)
+			log.Printf("Add Review Error:\n%+v", err)
 			return
 		}
 
@@ -105,7 +107,7 @@ func (rh *ReviewHandler) Add(c *fiber.Ctx) error {
 			Message:       fmt.Sprintf("Buyer [%s] Giving You A Rating [%v] And Review:\n%s", data.BuyerID, data.Rating, data.Review),
 		})
 		if err != nil {
-			log.Printf("Add Review Error:\n+%v", err)
+			log.Printf("Add Review Error:\n%+v", err)
 			return
 		}
 	}()
@@ -128,28 +130,40 @@ func (rh *ReviewHandler) Update(c *fiber.Ctx) error {
 	data := new(types.Review)
 	err := c.BodyParser(data)
 	if err != nil {
-		log.Printf("Update Review Error:\n+%v", err)
+		log.Printf("Update Review Error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "Invalid Data")
 	}
 
+	reviewId, err := uuid.Parse(c.Params("reviewId"))
+	if err != nil {
+		return err
+	}
+
+	data.ID = reviewId
+	data.BuyerID = userInfo.UserID
 	err = rh.validate.Struct(data)
 	if err != nil {
-		log.Printf("Update Review Error:\n+%v", err)
+		log.Printf("Update Review Error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "Invalid Data")
 	}
 
-	r, err := rh.reviewSvc.FindReviewByID(ctx, c.Params("reviewId"))
+	r, err := rh.reviewSvc.FindReviewByID(ctx, reviewId)
 	if err != nil {
-		log.Printf("Update Review Error:\n+%v", err)
+		log.Printf("Update Review Error:\n%+v", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fiber.NewError(http.StatusNotFound, "Review is not found")
 		}
 		return fiber.NewError(http.StatusBadRequest, "Error while saving review")
 	}
 
+	//TODO: REFACTORE THIS FUNCTION TO RETRIEVE REVIEW BY BUYER_ID AND REVIEW_ID
+	if r.BuyerID != userInfo.UserID {
+		return fiber.NewError(http.StatusBadRequest, "You cannot modify this review")
+	}
+
 	r, err = rh.reviewSvc.Update(ctx, *data)
 	if err != nil {
-		log.Printf("Update Review Error:\n+%v", err)
+		log.Printf("Update Review Error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "Error while updating review")
 	}
 
@@ -168,9 +182,14 @@ func (rh *ReviewHandler) Remove(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
 	}
 
-	_, err := rh.reviewSvc.FindReviewByID(ctx, c.Params("reviewId"))
+	reviewId, err := uuid.Parse(c.Params("reviewId"))
 	if err != nil {
-		log.Printf("Update Review Error:\n+%v", err)
+		return err
+	}
+
+	_, err = rh.reviewSvc.FindReviewByID(ctx, reviewId)
+	if err != nil {
+		log.Printf("Remove Review Error:\n%+v", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fiber.NewError(http.StatusNotFound, "Review is not found")
 		}
@@ -179,7 +198,7 @@ func (rh *ReviewHandler) Remove(c *fiber.Ctx) error {
 
 	err = rh.reviewSvc.Remove(ctx, c.Params("reviewId"))
 	if err != nil {
-		log.Printf("Update Review Error:\n+%v", err)
+		log.Printf("Remove Review Error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "Error while removing review")
 	}
 

@@ -29,7 +29,7 @@ func (g *GRPCClients) AddClient(serviceName, addr string) error {
 		return err
 	}
 
-	log.Printf("auth grpc client connected to [%s] grpc server on port [%s]", serviceName, addr)
+	log.Printf("order grpc client connected to [%s] grpc server on port [%s]", serviceName, addr)
 	g.services[serviceName] = conn
 	return nil
 }

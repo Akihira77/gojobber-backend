@@ -29,7 +29,7 @@ func (g *GRPCClients) AddClient(serviceName, addr string) error {
 		return err
 	}
 
-	log.Printf("gig grpc client connected to [%s] grpc server on port [%s]", serviceName, addr)
+	log.Printf("reviews grpc client connected to [%s] grpc server on port [%s]", serviceName, addr)
 	g.services[serviceName] = conn
 	return nil
 }
@@ -50,4 +50,3 @@ func (g *GRPCClients) CloseAll() {
 		conn.Close()
 	}
 }
-

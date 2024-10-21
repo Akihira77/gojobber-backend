@@ -21,7 +21,7 @@ const (
 	BASE_PATH = "/api/v1/reviews"
 )
 
-func MainRouter(db *gorm.DB, app *fiber.App) {
+func MainRouter(db *gorm.DB, app *fiber.App, ccs *handler.GRPCClients) {
 	app.Get("health-check", func(c *fiber.Ctx) error {
 		return c.Status(http.StatusOK).SendString("Review Service is healthy and OK.")
 	})
@@ -31,10 +31,10 @@ func MainRouter(db *gorm.DB, app *fiber.App) {
 	api.Use(authOnly)
 
 	rs := service.NewReviewService(db)
-	rh := handler.NewReviewHandler(rs)
+	rh := handler.NewReviewHandler(rs, ccs)
 
 	api.Get("/seller/:sellerId", rh.FindSellerReviews)
-	api.Post("/", rh.Add)
+	api.Post("", rh.Add)
 	api.Patch("/:reviewId", rh.Update)
 	api.Delete("/:reviewId", rh.Remove)
 }
@@ -83,7 +83,6 @@ func authOnly(c *fiber.Ctx) error {
 	}
 
 	claims, ok := token.Claims.(*types.JWTClaims)
-	log.Println(claims)
 	if !ok {
 		log.Println("token is not matched with claims")
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")

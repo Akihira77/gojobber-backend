@@ -134,6 +134,7 @@ func orderRouter(base_url string, r fiber.Router) {
 	r.Post("/:orderId/complete", oh.OrderComplete)
 	r.Post("/:orderId/cancel", oh.CancelOrder)
 	r.Post("/:orderId/refund", oh.OrderRefund)
+	r.Post("/:orderId/acknowledge", oh.AcknowledgeOrder)
 	r.Post("/deliver/:orderId", oh.DeliveringOrder)
 	r.Post("/deliver/:orderId/response", oh.BuyerResponseForDeliveredOrder)
 }
@@ -142,7 +143,7 @@ func reviewRouter(base_url string, r fiber.Router) {
 	rh := handler.NewReviewHandler(base_url)
 	r.Get("/health-check", rh.HealthCheck)
 	r.Get("/seller/:sellerId", rh.FindSellerReviews)
-	r.Post("/", rh.Add)
+	r.Post("", rh.Add)
 	r.Patch("/:reviewId", rh.Update)
 	r.Delete("/:reviewId", rh.Remove)
 }

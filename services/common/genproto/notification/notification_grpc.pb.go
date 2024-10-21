@@ -20,31 +20,33 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	NotificationService_UserVerifyingEmail_FullMethodName              = "/NotificationService/UserVerifyingEmail"
-	NotificationService_UserForgotPassword_FullMethodName              = "/NotificationService/UserForgotPassword"
-	NotificationService_UserSucessResetPassword_FullMethodName         = "/NotificationService/UserSucessResetPassword"
-	NotificationService_SendEmailChatNotification_FullMethodName       = "/NotificationService/SendEmailChatNotification"
-	NotificationService_SellerHasCompletedAnOrder_FullMethodName       = "/NotificationService/SellerHasCompletedAnOrder"
-	NotificationService_SellerRequestDeadlineExtension_FullMethodName  = "/NotificationService/SellerRequestDeadlineExtension"
-	NotificationService_SellerCanceledAnOrder_FullMethodName           = "/NotificationService/SellerCanceledAnOrder"
-	NotificationService_BuyerDeadlineExtensionResponse_FullMethodName  = "/NotificationService/BuyerDeadlineExtensionResponse"
-	NotificationService_BuyerRefundsAnOrder_FullMethodName             = "/NotificationService/BuyerRefundsAnOrder"
-	NotificationService_NotifySellerOrderHasBeenMade_FullMethodName    = "/NotificationService/NotifySellerOrderHasBeenMade"
-	NotificationService_NotifySellerGotAReview_FullMethodName          = "/NotificationService/NotifySellerGotAReview"
-	NotificationService_NotifyBuyerSellerDeliveredOrder_FullMethodName = "/NotificationService/NotifyBuyerSellerDeliveredOrder"
+	NotificationService_UserVerifyingEmail_FullMethodName                      = "/NotificationService/UserVerifyingEmail"
+	NotificationService_UserForgotPassword_FullMethodName                      = "/NotificationService/UserForgotPassword"
+	NotificationService_UserSucessResetPassword_FullMethodName                 = "/NotificationService/UserSucessResetPassword"
+	NotificationService_SendEmailChatNotification_FullMethodName               = "/NotificationService/SendEmailChatNotification"
+	NotificationService_SellerHasCompletedAnOrder_FullMethodName               = "/NotificationService/SellerHasCompletedAnOrder"
+	NotificationService_SellerRequestDeadlineExtension_FullMethodName          = "/NotificationService/SellerRequestDeadlineExtension"
+	NotificationService_SellerCanceledAnOrder_FullMethodName                   = "/NotificationService/SellerCanceledAnOrder"
+	NotificationService_BuyerDeadlineExtensionResponse_FullMethodName          = "/NotificationService/BuyerDeadlineExtensionResponse"
+	NotificationService_BuyerRefundsAnOrder_FullMethodName                     = "/NotificationService/BuyerRefundsAnOrder"
+	NotificationService_NotifySellerOrderHasBeenMade_FullMethodName            = "/NotificationService/NotifySellerOrderHasBeenMade"
+	NotificationService_NotifySellerGotAReview_FullMethodName                  = "/NotificationService/NotifySellerGotAReview"
+	NotificationService_NotifyBuyerSellerDeliveredOrder_FullMethodName         = "/NotificationService/NotifyBuyerSellerDeliveredOrder"
+	NotificationService_NotifyBuyerOrderHasAcknowledged_FullMethodName         = "/NotificationService/NotifyBuyerOrderHasAcknowledged"
+	NotificationService_NotifySellerBuyerResponseDeliveredOrder_FullMethodName = "/NotificationService/NotifySellerBuyerResponseDeliveredOrder"
 )
 
 // NotificationServiceClient is the client API for NotificationService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type NotificationServiceClient interface {
-	// From Auth Service
+	// NOTE: From Auth Service
 	UserVerifyingEmail(ctx context.Context, in *VerifyingEmailRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	UserForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	UserSucessResetPassword(ctx context.Context, in *SuccessResetPasswordRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// From Chat Service
+	// NOTE: From Chat Service
 	SendEmailChatNotification(ctx context.Context, in *EmailChatNotificationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	// From Order Service
+	// NOTE: From Order Service
 	SellerHasCompletedAnOrder(ctx context.Context, in *SellerCompletedAnOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SellerRequestDeadlineExtension(ctx context.Context, in *SellerDeadlineExtensionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SellerCanceledAnOrder(ctx context.Context, in *SellerCancelOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -53,6 +55,8 @@ type NotificationServiceClient interface {
 	NotifySellerOrderHasBeenMade(ctx context.Context, in *NotifySellerGotAnOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	NotifySellerGotAReview(ctx context.Context, in *NotifySellerGotAReviewRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	NotifyBuyerSellerDeliveredOrder(ctx context.Context, in *NotifyBuyerOrderDeliveredRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	NotifyBuyerOrderHasAcknowledged(ctx context.Context, in *NotifyBuyerOrderAcknowledgeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	NotifySellerBuyerResponseDeliveredOrder(ctx context.Context, in *NotifySellerBuyerResponseDeliveredOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type notificationServiceClient struct {
@@ -183,17 +187,37 @@ func (c *notificationServiceClient) NotifyBuyerSellerDeliveredOrder(ctx context.
 	return out, nil
 }
 
+func (c *notificationServiceClient) NotifyBuyerOrderHasAcknowledged(ctx context.Context, in *NotifyBuyerOrderAcknowledgeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, NotificationService_NotifyBuyerOrderHasAcknowledged_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notificationServiceClient) NotifySellerBuyerResponseDeliveredOrder(ctx context.Context, in *NotifySellerBuyerResponseDeliveredOrderRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, NotificationService_NotifySellerBuyerResponseDeliveredOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NotificationServiceServer is the server API for NotificationService service.
 // All implementations must embed UnimplementedNotificationServiceServer
 // for forward compatibility.
 type NotificationServiceServer interface {
-	// From Auth Service
+	// NOTE: From Auth Service
 	UserVerifyingEmail(context.Context, *VerifyingEmailRequest) (*emptypb.Empty, error)
 	UserForgotPassword(context.Context, *ForgotPasswordRequest) (*emptypb.Empty, error)
 	UserSucessResetPassword(context.Context, *SuccessResetPasswordRequest) (*emptypb.Empty, error)
-	// From Chat Service
+	// NOTE: From Chat Service
 	SendEmailChatNotification(context.Context, *EmailChatNotificationRequest) (*emptypb.Empty, error)
-	// From Order Service
+	// NOTE: From Order Service
 	SellerHasCompletedAnOrder(context.Context, *SellerCompletedAnOrderRequest) (*emptypb.Empty, error)
 	SellerRequestDeadlineExtension(context.Context, *SellerDeadlineExtensionRequest) (*emptypb.Empty, error)
 	SellerCanceledAnOrder(context.Context, *SellerCancelOrderRequest) (*emptypb.Empty, error)
@@ -202,6 +226,8 @@ type NotificationServiceServer interface {
 	NotifySellerOrderHasBeenMade(context.Context, *NotifySellerGotAnOrderRequest) (*emptypb.Empty, error)
 	NotifySellerGotAReview(context.Context, *NotifySellerGotAReviewRequest) (*emptypb.Empty, error)
 	NotifyBuyerSellerDeliveredOrder(context.Context, *NotifyBuyerOrderDeliveredRequest) (*emptypb.Empty, error)
+	NotifyBuyerOrderHasAcknowledged(context.Context, *NotifyBuyerOrderAcknowledgeRequest) (*emptypb.Empty, error)
+	NotifySellerBuyerResponseDeliveredOrder(context.Context, *NotifySellerBuyerResponseDeliveredOrderRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedNotificationServiceServer()
 }
 
@@ -247,6 +273,12 @@ func (UnimplementedNotificationServiceServer) NotifySellerGotAReview(context.Con
 }
 func (UnimplementedNotificationServiceServer) NotifyBuyerSellerDeliveredOrder(context.Context, *NotifyBuyerOrderDeliveredRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NotifyBuyerSellerDeliveredOrder not implemented")
+}
+func (UnimplementedNotificationServiceServer) NotifyBuyerOrderHasAcknowledged(context.Context, *NotifyBuyerOrderAcknowledgeRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifyBuyerOrderHasAcknowledged not implemented")
+}
+func (UnimplementedNotificationServiceServer) NotifySellerBuyerResponseDeliveredOrder(context.Context, *NotifySellerBuyerResponseDeliveredOrderRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifySellerBuyerResponseDeliveredOrder not implemented")
 }
 func (UnimplementedNotificationServiceServer) mustEmbedUnimplementedNotificationServiceServer() {}
 func (UnimplementedNotificationServiceServer) testEmbeddedByValue()                             {}
@@ -485,6 +517,42 @@ func _NotificationService_NotifyBuyerSellerDeliveredOrder_Handler(srv interface{
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotificationService_NotifyBuyerOrderHasAcknowledged_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifyBuyerOrderAcknowledgeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).NotifyBuyerOrderHasAcknowledged(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_NotifyBuyerOrderHasAcknowledged_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).NotifyBuyerOrderHasAcknowledged(ctx, req.(*NotifyBuyerOrderAcknowledgeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotificationService_NotifySellerBuyerResponseDeliveredOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifySellerBuyerResponseDeliveredOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotificationServiceServer).NotifySellerBuyerResponseDeliveredOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotificationService_NotifySellerBuyerResponseDeliveredOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotificationServiceServer).NotifySellerBuyerResponseDeliveredOrder(ctx, req.(*NotifySellerBuyerResponseDeliveredOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // NotificationService_ServiceDesc is the grpc.ServiceDesc for NotificationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -539,6 +607,14 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "NotifyBuyerSellerDeliveredOrder",
 			Handler:    _NotificationService_NotifyBuyerSellerDeliveredOrder_Handler,
+		},
+		{
+			MethodName: "NotifyBuyerOrderHasAcknowledged",
+			Handler:    _NotificationService_NotifyBuyerOrderHasAcknowledged_Handler,
+		},
+		{
+			MethodName: "NotifySellerBuyerResponseDeliveredOrder",
+			Handler:    _NotificationService_NotifySellerBuyerResponseDeliveredOrder_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

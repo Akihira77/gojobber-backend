@@ -18,13 +18,15 @@ type NotificationServiceImpl interface {
 	UserForgotPassword(receiverEmail, htmlTemplateName, resetLink, username string) error
 	UserSucessResetPassword(receiverEmail, htmlTemplateName, username string) error
 	SendEmailChatNotification(receiverEmail, senderEmail, message string) error
-	SellerHasCompletedAnOrder(receiverEmail, buyerEmail, orderID, sellerCurrentBalance string) error
-	BuyerDeadlineExtensionResponse(receiverEmail, message string) error
-	BuyerRefundsAnOrder(receiverEmail, reason string) error
-	SellerCanceledAnOrder(receiverEmail, reason string) error
+	SellerHasCompletedAnOrder(data *notification.SellerCompletedAnOrderRequest) error
+	SellerRequestDeadlineExtension(data *notification.SellerDeadlineExtensionRequest) error
+	BuyerDeadlineExtensionResponse(data *notification.BuyerDeadlineExtension) error
+	BuyerRefundsAnOrder(data *notification.BuyerRefundsOrderRequest) error
+	SellerCanceledAnOrder(data *notification.SellerCancelOrderRequest) error
 	NotifySellerGotAnOrder(data *notification.NotifySellerGotAnOrderRequest) error
 	NotifySellerGotAReview(data *notification.NotifySellerGotAReviewRequest) error
 	NotifyBuyerSellerDeliveredOrder(data *notification.NotifyBuyerOrderDeliveredRequest) error
+	NotifyBuyerSellerProcessedOrder(data *notification.NotifyBuyerOrderAcknowledgeRequest) error
 }
 
 func NewNotificationService() NotificationServiceImpl {
@@ -34,13 +36,38 @@ func NewNotificationService() NotificationServiceImpl {
 }
 
 // TODO: IMPLEMENT HTML TEMPLATE
+func (ns *NotificationService) NotifyBuyerSellerProcessedOrder(data *notification.NotifyBuyerOrderAcknowledgeRequest) error {
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		errCh <- helper.
+			SendMail(
+				data.ReceiverEmail,
+				fmt.Sprint("Seller Has Acknowledge Your Order And Start Working On It"),
+				fmt.Sprintf("Check your order %s", data.Url),
+			)
+	}()
+
+	wg.Wait()
+	close(errCh)
+	return <-errCh
+}
+
+// TODO: IMPLEMENT HTML TEMPLATE
+// AND REFACTORE request payload to ADD THE URL TO OUR PLATFORM
 func (ns *NotificationService) NotifyBuyerSellerDeliveredOrder(data *notification.NotifyBuyerOrderDeliveredRequest) error {
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		errCh <- helper.SendMail(data.ReceiverEmail, fmt.Sprintf("Seller Has Sent Your Order Progress. Check Out Your Order!"), "Check Your Order Progress")
+		errCh <- helper.SendMail(
+			data.ReceiverEmail,
+			fmt.Sprintf("Seller Has Sent Your Order Progress. Check Out Your Order!"),
+			fmt.Sprintf("Check your order %s", data.Url),
+		)
 	}()
 
 	wg.Wait()
@@ -83,14 +110,18 @@ func (ns *NotificationService) NotifySellerGotAnOrder(data *notification.NotifyS
 	return <-errCh
 }
 
-func (ns *NotificationService) SellerCanceledAnOrder(receiverEmail string, reason string) error {
+func (ns *NotificationService) SellerCanceledAnOrder(data *notification.SellerCancelOrderRequest) error {
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		errCh <- helper.SendMail(receiverEmail, fmt.Sprintf("Seller Has Canceled Your Order"), reason)
+		errCh <- helper.SendMail(
+			data.ReceiverEmail,
+			fmt.Sprintf("Seller Has Canceled Your Order"),
+			fmt.Sprintf("Check your order %s", data.Url),
+		)
 	}()
 
 	wg.Wait()
@@ -99,14 +130,18 @@ func (ns *NotificationService) SellerCanceledAnOrder(receiverEmail string, reaso
 }
 
 // TODO: REFACTORE
-func (ns *NotificationService) BuyerDeadlineExtensionResponse(receiverEmail string, message string) error {
+func (ns *NotificationService) SellerRequestDeadlineExtension(data *notification.SellerDeadlineExtensionRequest) error {
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		errCh <- helper.SendMail(receiverEmail, fmt.Sprintf("Buyer Response Your Deadline Extension"), message)
+		errCh <- helper.SendMail(
+			data.ReceiverEmail,
+			fmt.Sprintf("Seller Requested A Deadline Extension"),
+			fmt.Sprintf("Check your order %s", data.Url),
+		)
 	}()
 
 	wg.Wait()
@@ -115,14 +150,38 @@ func (ns *NotificationService) BuyerDeadlineExtensionResponse(receiverEmail stri
 }
 
 // TODO: REFACTORE
-func (ns *NotificationService) BuyerRefundsAnOrder(receiverEmail string, reason string) error {
+func (ns *NotificationService) BuyerDeadlineExtensionResponse(data *notification.BuyerDeadlineExtension) error {
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		errCh <- helper.SendMail(receiverEmail, fmt.Sprintf("Buyer Refunds The Order"), reason)
+		errCh <- helper.SendMail(
+			data.ReceiverEmail,
+			fmt.Sprintf("Buyer Response Your Deadline Extension"),
+			fmt.Sprintf("Check your order %s", data.Url),
+		)
+	}()
+
+	wg.Wait()
+	close(errCh)
+	return <-errCh
+}
+
+// TODO: REFACTORE
+func (ns *NotificationService) BuyerRefundsAnOrder(data *notification.BuyerRefundsOrderRequest) error {
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		errCh <- helper.SendMail(
+			data.ReceiverEmail,
+			fmt.Sprintf("Buyer Refunds The Order"),
+			fmt.Sprintf("Check your order %s", data.Url),
+		)
 	}()
 
 	wg.Wait()
@@ -188,14 +247,21 @@ func (ns *NotificationService) UserVerifyingEmail(receiverEmail string, htmlTemp
 	return <-errCh
 }
 
-func (ns *NotificationService) SellerHasCompletedAnOrder(receiverEmail, buyerEmail, orderID, sellerCurrentBalance string) error {
+func (ns *NotificationService) SellerHasCompletedAnOrder(data *notification.SellerCompletedAnOrderRequest) error {
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
-		helper.SellerOrderHasCompleted(errCh, receiverEmail, fmt.Sprintf("Your Order [%s] Has Marked As Complete By Buyer %s", orderID, buyerEmail), buyerEmail, orderID, sellerCurrentBalance)
+		// helper.SellerOrderHasCompleted(errCh, receiverEmail, fmt.Sprintf("Your Order [%s] Has Marked As Complete By Buyer %s", orderID, buyerEmail), buyerEmail, orderID, sellerCurrentBalance)
+
+		errCh <- helper.SendMail(
+			data.ReceiverEmail,
+			fmt.Sprintf("Buyer [%s] Mark Your Order [%s] As COMPLETED", data.BuyerEmail, data.OrderId),
+			fmt.Sprintf("Your Current Balance is: %s.\nCheck Your Order %s", data.SellerCurrentBalance, data.Url),
+		)
+
 	}()
 
 	wg.Wait()

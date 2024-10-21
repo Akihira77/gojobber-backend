@@ -20,18 +20,18 @@ import (
 )
 
 type AuthHttpHandler struct {
-	validate     *validator.Validate
-	authSvc      svc.AuthServiceImpl
-	cld          *util.Cloudinary
-	grpcServices *GRPCClients
+	validate   *validator.Validate
+	authSvc    svc.AuthServiceImpl
+	cld        *util.Cloudinary
+	grpcClient *GRPCClients
 }
 
 func NewAuthHttpHandler(authSvc svc.AuthServiceImpl, cld *util.Cloudinary, grpcServices *GRPCClients) *AuthHttpHandler {
 	return &AuthHttpHandler{
-		validate:     validator.New(validator.WithRequiredStructEnabled()),
-		authSvc:      authSvc,
-		cld:          cld,
-		grpcServices: grpcServices,
+		validate:   validator.New(validator.WithRequiredStructEnabled()),
+		authSvc:    authSvc,
+		cld:        cld,
+		grpcClient: grpcServices,
 	}
 }
 
@@ -159,7 +159,7 @@ func (ah *AuthHttpHandler) SignUp(c *fiber.Ctx) error {
 
 	data.ProfilePicture = uploadResult.SecureURL
 	data.ProfilePublicID = uploadResult.PublicID
-	cc, err := ah.grpcServices.GetClient("USER_SERVICE")
+	cc, err := ah.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
@@ -259,7 +259,7 @@ func (ah *AuthHttpHandler) SendVerifyEmailURL(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please re-signin")
 	}
 
-	cc, err := ah.grpcServices.GetClient("NOTIFICATION_SERVICE")
+	cc, err := ah.grpcClient.GetClient("NOTIFICATION_SERVICE")
 	if err != nil {
 		log.Printf("sendverifyemail error:\n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error sending email")
@@ -306,7 +306,7 @@ func (ah *AuthHttpHandler) SendForgotPasswordURL(c *fiber.Ctx) error {
 		return fiber.ErrInternalServerError
 	}
 
-	cc, err := ah.grpcServices.GetClient("NOTIFICATION_SERVICE")
+	cc, err := ah.grpcClient.GetClient("NOTIFICATION_SERVICE")
 	if err != nil {
 		fmt.Printf("sendforgotpasswordurl error:\n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
@@ -388,7 +388,7 @@ func (ah *AuthHttpHandler) ResetPassword(c *fiber.Ctx) error {
 		return fiber.ErrInternalServerError
 	}
 
-	cc, err := ah.grpcServices.GetClient("NOTIFICATION_SERVICE")
+	cc, err := ah.grpcClient.GetClient("NOTIFICATION_SERVICE")
 	if err != nil {
 		fmt.Printf("resetpasswordsuccess error:\n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")

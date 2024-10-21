@@ -884,8 +884,8 @@ func (ss *SellerService) Update(ctx context.Context, updatedSellerData *types.Se
 
 func (ss *SellerService) UpdateBalance(ctx context.Context, sellerID string, addedBalance uint64) (*types.SellerIncBalanceDTO, error) {
 	type Result struct {
-		Seller types.Seller
-		Email  string `json:"email" gorm:"email"`
+		types.Seller
+		Email string `json:"email" gorm:"email"`
 	}
 	var resultData Result
 

@@ -37,26 +37,27 @@ message SellerCompletedAnOrderRequest {
     string buyerEmail = 2;
     string orderId = 3;
     string sellerCurrentBalance = 4;
+    string url = 5;
 }
 
 message SellerDeadlineExtensionRequest {
     string receiverEmail = 1;
-    string reason = 2;
+    string url = 2;
 }
 
 message SellerCancelOrderRequest {
     string receiverEmail = 1;
-    string reason = 2;
+    string url = 2;
 }
 
 message BuyerDeadlineExtension {
     string receiverEmail = 1;
-    string message = 2;
+    string url = 2;
 }
 
 message BuyerRefundsOrderRequest {
     string receiverEmail = 1;
-    string reason = 2;
+    string url = 2;
 }
 
 message OrderDetail {
@@ -80,19 +81,28 @@ message NotifySellerGotAReviewRequest {
 
 message NotifyBuyerOrderDeliveredRequest {
     string receiverEmail = 1;
+    string url = 2;
+}
+
+message NotifyBuyerOrderAcknowledgeRequest {
+    string receiverEmail = 1;
+    string url = 2;
+}
+
+message NotifySellerBuyerResponseDeliveredOrderRequest {
+    string receiverEmail = 1;
 }
 
 service NotificationService {
-    // From Auth Service
+//NOTE: From Auth Service
     rpc UserVerifyingEmail(VerifyingEmailRequest) returns (google.protobuf.Empty) {}
     rpc UserForgotPassword(ForgotPasswordRequest) returns (google.protobuf.Empty) {}
     rpc UserSucessResetPassword(SuccessResetPasswordRequest) returns (google.protobuf.Empty) {}
 
-
-    // From Chat Service
+//NOTE: From Chat Service
     rpc SendEmailChatNotification(EmailChatNotificationRequest) returns (google.protobuf.Empty) {}
 
-    // From Order Service
+//NOTE: From Order Service
     rpc SellerHasCompletedAnOrder(SellerCompletedAnOrderRequest) returns (google.protobuf.Empty) {}
     rpc SellerRequestDeadlineExtension(SellerDeadlineExtensionRequest) returns (google.protobuf.Empty) {}
     rpc SellerCanceledAnOrder(SellerCancelOrderRequest) returns (google.protobuf.Empty) {}
@@ -101,4 +111,6 @@ service NotificationService {
     rpc NotifySellerOrderHasBeenMade(NotifySellerGotAnOrderRequest) returns (google.protobuf.Empty) {}
     rpc NotifySellerGotAReview(NotifySellerGotAReviewRequest) returns (google.protobuf.Empty) {}
     rpc NotifyBuyerSellerDeliveredOrder(NotifyBuyerOrderDeliveredRequest) returns (google.protobuf.Empty) {}
+    rpc NotifyBuyerOrderHasAcknowledged(NotifyBuyerOrderAcknowledgeRequest) returns (google.protobuf.Empty) {}
+    rpc NotifySellerBuyerResponseDeliveredOrder(NotifySellerBuyerResponseDeliveredOrderRequest) returns (google.protobuf.Empty) {}
 }

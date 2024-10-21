@@ -45,10 +45,10 @@ func (os *OrderService) ChangeOrderStatus(ctx context.Context, o types.Order, ne
 		Begin()
 
 	o.Status = newStatus
-	result := os.db.
-		Debug().
-		WithContext(ctx).
-		Save(&o)
+	result := tx.
+		Model(&types.Order{}).
+		Where("id = ?", o.ID).
+		Update("status", newStatus)
 	if result.Error != nil {
 		tx.Rollback()
 		return nil, result.Error
@@ -148,15 +148,10 @@ func (os *OrderService) OrderDeliveredResponse(ctx context.Context, o types.Orde
 		return &o, result.Error
 	}
 
-	result = tx.Save(&o)
-	if result.Error != nil {
-		tx.Rollback()
-		return &o, result.Error
-	}
-
 	result = tx.
 		Model(&types.Order{}).
 		Preload("DeliveredHistories").
+		Preload("OrderEvents").
 		Where("id = ?", o.ID).
 		First(&o)
 	if result.Error != nil {
@@ -180,7 +175,13 @@ func (os *OrderService) DeliveringOrder(ctx context.Context, o types.Order, dh t
 
 	result := tx.
 		Model(&types.DeliveredHistory{}).
-		Create(&dh)
+		Create(&types.DeliveredHistory{
+			OrderID:       o.ID,
+			ResultURL:     dh.ResultURL,
+			BuyerNote:     dh.BuyerNote,
+			ProgressNote:  dh.ProgressNote,
+			DeliveredDate: time.Now(),
+		})
 	if result.Error != nil {
 		tx.Rollback()
 		return &o, result.Error
@@ -198,15 +199,10 @@ func (os *OrderService) DeliveringOrder(ctx context.Context, o types.Order, dh t
 		return &o, result.Error
 	}
 
-	result = tx.Save(&o)
-	if result.Error != nil {
-		tx.Rollback()
-		return &o, result.Error
-	}
-
 	result = tx.
 		Model(&types.Order{}).
 		Preload("DeliveredHistories").
+		Preload("OrderEvents").
 		Where("id = ?", o.ID).
 		First(&o)
 	if result.Error != nil {
@@ -225,7 +221,7 @@ func (os *OrderService) RequestDeadlineExtension(ctx context.Context, o types.Or
 		WithContext(ctx).
 		Begin()
 
-	deadline := o.Deadline.Add(time.Duration(data.NumberOfDays))
+	deadline := o.Deadline.AddDate(0, 0, data.NumberOfDays)
 	result := tx.
 		Model(&types.OrderEvent{}).
 		Create(&types.OrderEvent{
@@ -233,15 +229,6 @@ func (os *OrderService) RequestDeadlineExtension(ctx context.Context, o types.Or
 			Event:     fmt.Sprintf("Seller Requesting To Extend The Deadline To Become [%v] With Reason:\n%s", deadline, data.Reason),
 			CreatedAt: time.Now(),
 		})
-	if result.Error != nil {
-		tx.Rollback()
-		return result.Error
-	}
-
-	result = os.db.
-		Debug().
-		WithContext(ctx).
-		Save(&o)
 	if result.Error != nil {
 		tx.Rollback()
 		return result.Error
@@ -260,14 +247,17 @@ func (os *OrderService) DeadlineExtensionResponse(ctx context.Context, o types.O
 
 	switch status {
 	case types.ACCEPTED:
-		o.Deadline = o.Deadline.Add(time.Duration(data.NumberOfDays))
-		result := tx.Save(&o)
+		deadline := o.Deadline.AddDate(0, 0, data.NumberOfDays)
+		msg := fmt.Sprintf("Buyer Accepted Seller Order Deadline Extension From [%v] To [%v]", o.Deadline, deadline)
+		result := tx.
+			Model(&types.Order{}).
+			Where("id = ?", o.ID).
+			Update("deadline", deadline)
 		if result.Error != nil {
 			tx.Rollback()
 			return "", result.Error
 		}
 
-		msg := fmt.Sprintf("Buyer Accepted Seller Order Deadline Extension From [%v] To [%v]", o.Deadline, o.Deadline.Add(time.Duration(data.NumberOfDays)))
 		result = tx.
 			Model(&types.OrderEvent{}).
 			Create(&types.OrderEvent{
@@ -335,6 +325,7 @@ func (os *OrderService) FindOrderByID(ctx context.Context, id string) (*types.Or
 		WithContext(ctx).
 		Model(&types.Order{}).
 		Preload("DeliveredHistories").
+		Preload("OrderEvents").
 		Where("id = ?", id).
 		First(&o)
 
