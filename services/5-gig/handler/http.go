@@ -335,6 +335,13 @@ func (gh *GigHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while parsing body")
 	}
 
+	err = gh.validate.Struct(data)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
+	}
+
 	cc, err := gh.grpcClient.GetClient("USER_SERVICE")
 	if err != nil {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
@@ -351,12 +358,6 @@ func (gh *GigHandler) Create(c *fiber.Ctx) error {
 	}
 
 	data.SellerID = s.Id
-	err = gh.validate.Struct(data)
-	if err != nil {
-		log.Printf("create gig:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
-	}
-
 	formHeader, err := c.FormFile("imageFile")
 	if err != nil {
 		log.Printf("create gig:\n%+v", err)
@@ -420,8 +421,9 @@ func (gh *GigHandler) Update(c *fiber.Ctx) error {
 
 	err = gh.validate.Struct(data)
 	if err != nil {
-		log.Printf("update gig:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	if data.CoverImage == "" {

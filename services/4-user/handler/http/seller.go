@@ -129,10 +129,11 @@ func (sh *SellerHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please check again your data")
 	}
 
-	if err := sh.validate.Struct(data); err != nil {
-		fmt.Printf("%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data. Please check again your data")
-
+	err := sh.validate.Struct(data)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	sellerDataInBuyerDB, err := sh.buyerSvc.FindBuyerByID(ctx, userInfo.UserID)
@@ -199,10 +200,11 @@ func (sh *SellerHandler) Update(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please check again your data")
 	}
 
-	if err := sh.validate.Struct(data); err != nil {
-		fmt.Printf("%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data. Please check again your data")
-
+	err := sh.validate.Struct(data)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	seller, err := sh.sellerSvc.FindSellerByBuyerID(ctx, userInfo.UserID)

@@ -48,7 +48,7 @@ func authOnly(c *fiber.Ctx) error {
 
 	claims, ok := token.Claims.(*types.JWTClaims)
 	if !ok {
-		fmt.Println("token is not matched with claims: claims", token.Claims)
+		fmt.Println("token is not matched with claims:", token.Claims)
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 
@@ -70,14 +70,14 @@ func MainRouter(app *fiber.App) {
 	api := app.Group(BASE_PATH)
 	api.Use(generateGatewayToken)
 
-	handler.WsUpgrade(api.Use(authOnly))
-
 	authRouter(AUTH_URL, api.Group("/auths"))
 	userRouter(USER_URL, api.Group("/users"))
 	gigRouter(GIG_URL, api.Group("/gigs"))
 	chatRouter(CHAT_URL, api.Group("/chats"))
 	orderRouter(ORDER_URL, api.Group("/orders"))
 	reviewRouter(REVIEW_URL, api.Group("/reviews"))
+
+	handler.WsUpgrade(api.Use(authOnly))
 
 	app.All("*", func(c *fiber.Ctx) error {
 		return c.Status(http.StatusNotFound).SendString("Resource is not found")

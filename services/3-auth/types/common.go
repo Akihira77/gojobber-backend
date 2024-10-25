@@ -15,3 +15,8 @@ type RabbitMQResponse[T any] struct {
 	Success bool `json:"success"`
 	Data    T    `json:"data"`
 }
+
+type ErrorResult struct {
+	Field string `json:"field"`
+	Error string `json:"error"`
+}

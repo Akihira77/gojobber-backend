@@ -13,6 +13,7 @@ import (
 
 	"github.com/Akihira77/gojobber/services/7-order/service"
 	"github.com/Akihira77/gojobber/services/7-order/types"
+	"github.com/Akihira77/gojobber/services/7-order/util"
 	"github.com/Akihira77/gojobber/services/common/genproto/chat"
 	"github.com/Akihira77/gojobber/services/common/genproto/notification"
 	"github.com/Akihira77/gojobber/services/common/genproto/user"
@@ -145,8 +146,9 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 
 	err = oh.validate.Struct(data)
 	if err != nil {
-		log.Printf("CreatePaymentIntent error:\n+%v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
@@ -431,8 +433,9 @@ func (oh *OrderHttpHandler) SellerCancellingOrder(c *fiber.Ctx) error {
 
 	err = oh.validate.Struct(data)
 	if err != nil {
-		log.Printf("SellerCancellingOrder error:\n+%v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	o, err := oh.orderSvc.FindOrderByID(ctx, c.Params("orderId"))
@@ -535,8 +538,9 @@ func (oh *OrderHttpHandler) RequestDeadlineExtension(c *fiber.Ctx) error {
 
 	err = oh.validate.Struct(data)
 	if err != nil {
-		log.Printf("RequestExtendingDeadline error:\n+%v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	o, err := oh.orderSvc.FindOrderByID(ctx, c.Params("orderId"))
@@ -612,9 +616,10 @@ func (oh *OrderHttpHandler) BuyerDeadlineExtensionResponse(c *fiber.Ctx) error {
 	}
 
 	err = oh.validate.Struct(data)
-	if err != nil || (data.BuyerResponse != types.ACCEPTED && data.BuyerResponse != types.REJECTED) {
-		log.Printf("BuyerDeadlineExtensionResponse error:\n+%v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	o, err := oh.orderSvc.FindOrderByID(ctx, c.Params("orderId"))
@@ -690,8 +695,9 @@ func (oh *OrderHttpHandler) BuyerRefundingOrder(c *fiber.Ctx) error {
 
 	err = oh.validate.Struct(data)
 	if err != nil {
-		log.Printf("BuyerRefundingOrder error:\n+%v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	o, err := oh.orderSvc.FindOrderByID(ctx, c.Params("orderId"))
@@ -794,8 +800,9 @@ func (oh *OrderHttpHandler) SellerDeliverOrder(c *fiber.Ctx) error {
 	data.OrderID = o.ID
 	err = oh.validate.Struct(data)
 	if err != nil {
-		log.Printf("SellerDeliverOrder Error:\n+%v", err)
-		return fiber.NewError(http.StatusBadRequest, "Invalid Provided Data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	o, err = oh.orderSvc.DeliveringOrder(ctx, *o, *data)
@@ -923,8 +930,9 @@ func (oh *OrderHttpHandler) BuyerResponseForDeliveredOrder(c *fiber.Ctx) error {
 
 	err = oh.validate.Struct(data)
 	if err != nil {
-		log.Printf("BuyerResponseForDeliveredOrder Error:\n+%v", err)
-		return fiber.NewError(http.StatusBadRequest, "Invalid Provided Data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	o, err = oh.orderSvc.OrderDeliveredResponse(ctx, *o, data)

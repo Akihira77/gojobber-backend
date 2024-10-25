@@ -174,9 +174,11 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 	}
 
 	data.ReceiverEmail = receiverUser.Email
-	if err := ch.validate.Struct(data); err != nil {
-		fmt.Printf("InsertMessage Error:\n+%v", err)
-		return fiber.NewError(http.StatusBadRequest, "Error validating request body")
+	err = ch.validate.Struct(data)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	formHeader, err := c.FormFile("file")

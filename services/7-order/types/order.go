@@ -106,7 +106,7 @@ type CreateOrderDTO struct {
 type DeadlineExtensionRequest struct {
 	NumberOfDays  int                     `json:"numberOfDays" validate:"required,gte=1,lte=365"`
 	Reason        string                  `json:"reason" validate:"required"`
-	BuyerResponse DeadlineExtensionStatus `json:"buyerResponse"`
+	BuyerResponse DeadlineExtensionStatus `json:"buyerResponse" validate:"oneof=ACCEPTED REJECTED"`
 }
 
 func ApplyDBSetup(db *gorm.DB) error {

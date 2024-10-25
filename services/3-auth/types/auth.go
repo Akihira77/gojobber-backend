@@ -6,29 +6,19 @@ import (
 	"time"
 )
 
-// type Buyer struct {
-// 	ID             string    `json:"id" gorm:"primaryKey;not null"`
-// 	Username       string    `json:"username" gorm:"not null"`
-// 	Email          string    `json:"email" gorm:"not null"`
-// 	Country        string    `json:"country" gorm:"not null"`
-// 	ProfilePicture string    `json:"profilePicture" gorm:"not null"`
-// 	IsSeller       bool      `json:"isSeller" gorm:"not null; default:false"`
-// 	CreatedAt      time.Time `json:"createdAt" gorm:"not null"`
-// }
-
 type Auth struct {
-	ID                     string         `json:"id" gorm:"primaryKey;column:id;not null"`
-	Username               string         `json:"username" gorm:"index:idx_username,unique;column:username;not null"`
-	Password               string         `json:"password" gorm:"column:password;not null"`
-	Email                  string         `json:"email" gorm:"index:idx_email,unique;column:email;not null"`
-	ProfilePublicID        string         `json:"profilePublicId" gorm:"column:profile_public_id;not null"`
-	Country                string         `json:"country" gorm:"column:country;not null"`
-	ProfilePicture         string         `json:"profilePicture" gorm:"column:profile_picture;not null"`
+	ID                     string         `json:"id" gorm:"primaryKey;not null"`
+	Username               string         `json:"username" gorm:"index:idx_username,unique;not null"`
+	Password               string         `json:"password" gorm:"not null"`
+	Email                  string         `json:"email" gorm:"index:idx_email,unique;not null"`
+	ProfilePublicID        string         `json:"profilePublicId" gorm:"not null"`
+	Country                string         `json:"country" gorm:"not null"`
+	ProfilePicture         string         `json:"profilePicture" gorm:"not null"`
 	EmailVerificationToken sql.NullString `json:"emailVerificationToken"`
-	EmailVerified          bool           `json:"emailVerified" gorm:"default:false;column:email_verified;not null"`
-	CreatedAt              time.Time      `json:"createdAt" gorm:"column:created_at;not null"`
-	PasswordResetExpires   *time.Time     `json:"passwordResetExpires" gorm:"default:null;column:password_reset_expires"`
-	PasswordResetToken     sql.NullString `json:"passwordResetToken" gorm:"default:null;column:password_reset_token"`
+	EmailVerified          bool           `json:"emailVerified" gorm:"default:false;not null"`
+	CreatedAt              time.Time      `json:"createdAt" gorm:"not null"`
+	PasswordResetExpires   *time.Time     `json:"passwordResetExpires" gorm:"default:null;"`
+	PasswordResetToken     sql.NullString `json:"passwordResetToken" gorm:"default:null;"`
 }
 
 type AuthExcludePassword struct {
@@ -38,7 +28,7 @@ type AuthExcludePassword struct {
 	ProfilePublicID        string     `json:"profilePublicId,omitempty"`
 	Country                string     `json:"country"`
 	ProfilePicture         string     `json:"profilePicture"`
-	EmailVerificationToken string     `json:"emailVerificationToken,omitempty" gorm:"column:email_verification_token;"`
+	EmailVerificationToken string     `json:"emailVerificationToken,omitempty"`
 	EmailVerified          bool       `json:"emailVerified"`
 	CreatedAt              *time.Time `json:"createdAt,omitempty"`
 	PasswordResetExpires   *time.Time `json:"passwordResetExpires,omitempty"`

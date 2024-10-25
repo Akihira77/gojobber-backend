@@ -10,6 +10,7 @@ import (
 
 	"github.com/Akihira77/gojobber/services/8-review/service"
 	"github.com/Akihira77/gojobber/services/8-review/types"
+	"github.com/Akihira77/gojobber/services/8-review/util"
 	"github.com/Akihira77/gojobber/services/common/genproto/notification"
 	"github.com/Akihira77/gojobber/services/common/genproto/user"
 	"github.com/go-playground/validator/v10"
@@ -69,8 +70,9 @@ func (rh *ReviewHandler) Add(c *fiber.Ctx) error {
 	data.BuyerID = userInfo.UserID
 	err = rh.validate.Struct(data)
 	if err != nil {
-		log.Printf("Add Review Error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "Invalid Data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	cc, err := rh.grpcClient.GetClient("USER_SERVICE")
@@ -143,8 +145,9 @@ func (rh *ReviewHandler) Update(c *fiber.Ctx) error {
 	data.BuyerID = userInfo.UserID
 	err = rh.validate.Struct(data)
 	if err != nil {
-		log.Printf("Update Review Error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "Invalid Data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	r, err := rh.reviewSvc.FindReviewByID(ctx, reviewId)

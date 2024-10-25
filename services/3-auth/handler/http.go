@@ -58,8 +58,9 @@ func (ah *AuthHttpHandler) SignIn(c *fiber.Ctx) error {
 
 	err := ah.validate.Struct(data)
 	if err != nil {
-		fmt.Printf("signin error: \n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data. Please correct your data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	u, err := ah.authSvc.FindUserByUsernameOrEmailIncPassword(ctx, data.Username)
@@ -114,8 +115,9 @@ func (ah *AuthHttpHandler) SignUp(c *fiber.Ctx) error {
 
 	err := ah.validate.Struct(data)
 	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	formHeader, err := c.FormFile("avatar")
@@ -354,8 +356,9 @@ func (ah *AuthHttpHandler) ResetPassword(c *fiber.Ctx) error {
 
 	err := ah.validate.Struct(obj)
 	if err != nil {
-		fmt.Printf("resetpassword error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	if obj.Password != obj.ConfirmPassword {
@@ -426,8 +429,9 @@ func (ah *AuthHttpHandler) ChangePassword(c *fiber.Ctx) error {
 
 	err := ah.validate.Struct(obj)
 	if err != nil {
-		fmt.Printf("changepassword error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)

@@ -121,7 +121,7 @@ type GigSellerDTO struct {
 }
 
 type CreateGigDTO struct {
-	SellerID             string         `json:"sellerId" validate:"required"`
+	SellerID             string         `json:"sellerId"`
 	Title                string         `json:"title" form:"title" validate:"required"`
 	Description          string         `json:"description" form:"description" validate:"required"`
 	Category             string         `json:"category" form:"category" validate:"required"`
