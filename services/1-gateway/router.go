@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Akihira77/gojobber/services/1-gateway/handler"
+	"github.com/Akihira77/gojobber/services/1-gateway/types"
 	"github.com/Akihira77/gojobber/services/1-gateway/util"
 	"github.com/gofiber/fiber/v2"
 )
@@ -28,6 +30,32 @@ func generateGatewayToken(c *fiber.Ctx) error {
 	return c.Next()
 }
 
+func authOnly(c *fiber.Ctx) error {
+	tokenStr := c.Cookies("token")
+	if tokenStr == "" {
+		authHeader := c.Get("Authorization")
+		if authHeader == "" || len(strings.Split(authHeader, " ")) == 0 {
+			return fiber.NewError(http.StatusUnauthorized, "sign in first")
+		}
+		tokenStr = strings.Split(authHeader, " ")[1]
+	}
+
+	token, err := util.VerifyingJWT(os.Getenv("JWT_SECRET"), tokenStr)
+	if err != nil {
+		fmt.Printf("authOnly error:\n%+v", err)
+		return fiber.NewError(http.StatusUnauthorized, "sign in first")
+	}
+
+	claims, ok := token.Claims.(*types.JWTClaims)
+	if !ok {
+		fmt.Println("token is not matched with claims: claims", token.Claims)
+		return fiber.NewError(http.StatusUnauthorized, "sign in first")
+	}
+
+	c.SetUserContext(context.WithValue(c.UserContext(), "current_user", claims))
+	return c.Next()
+}
+
 func MainRouter(app *fiber.App) {
 	app.Get("/health-check", func(c *fiber.Ctx) error {
 		return c.Status(http.StatusOK).SendString("API Gateway Service is health and OK!")
@@ -42,7 +70,7 @@ func MainRouter(app *fiber.App) {
 	api := app.Group(BASE_PATH)
 	api.Use(generateGatewayToken)
 
-	handler.WsUpgrade(api)
+	handler.WsUpgrade(api.Use(authOnly))
 
 	authRouter(AUTH_URL, api.Group("/auths"))
 	userRouter(USER_URL, api.Group("/users"))
@@ -60,14 +88,16 @@ func authRouter(base_url string, r fiber.Router) {
 	ah := handler.NewAuthHandler(base_url)
 	r.Get("/health-check", ah.HealthCheck)
 
-	r.Get("/user-info", ah.GetUserInfo)
-	r.Get("/refresh-token/:username", ah.RefreshToken)
 	r.Post("/signin", ah.SignIn)
 	r.Post("/signup", ah.SignUp)
-	r.Post("/send-verification-email", ah.SendVerifyEmailURL)
-	r.Patch("/verify-email/:token", ah.VerifyEmail)
 	r.Patch("/forgot-password/:email", ah.SendForgotPasswordURL)
 	r.Patch("/reset-password/:token", ah.ResetPassword)
+
+	r.Use(authOnly)
+	r.Get("/user-info", ah.GetUserInfo)
+	r.Get("/refresh-token/:username", ah.RefreshToken)
+	r.Post("/send-verification-email", ah.SendVerifyEmailURL)
+	r.Patch("/verify-email/:token", ah.VerifyEmail)
 	r.Patch("/change-password", ah.ChangePassword)
 }
 
@@ -75,6 +105,7 @@ func userRouter(base_url string, r fiber.Router) {
 	uh := handler.NewUserHandler(base_url)
 	r.Get("/health-check", uh.HealthCheck)
 
+	r.Use(authOnly)
 	r.Get("/buyers/my-info", uh.GetMyBuyerInfo)
 	r.Get("/buyers/:username", uh.FindBuyerByUsername)
 
@@ -91,6 +122,7 @@ func gigRouter(base_url string, r fiber.Router) {
 	gh := handler.NewGigHandler(base_url)
 	r.Get("/health-check", gh.HealthCheck)
 
+	r.Use(authOnly)
 	r.Get("/id/:id", gh.FindGigByID)
 	r.Get("/sellers/active/:page/:size", gh.FindSellerActiveGigs)
 	r.Get("/sellers/inactive/:page/:size", gh.FindSellerInactiveGigs)
@@ -109,6 +141,7 @@ func chatRouter(base_url string, r fiber.Router) {
 	r.Get("/health-check", ch.HealthCheck)
 
 	// r.Get("/my-notifications", ch.GetAllMyConversations)
+	r.Use(authOnly)
 	r.Get("/my-conversations", ch.GetAllMyConversations)
 	r.Get("/id/:conversationId", ch.GetMessagesInsideConversation)
 	r.Post("", ch.InsertMessage)
@@ -118,6 +151,8 @@ func chatRouter(base_url string, r fiber.Router) {
 func orderRouter(base_url string, r fiber.Router) {
 	oh := handler.NewOrderHandler(base_url)
 	r.Get("/health-check", oh.HealthCheck)
+
+	r.Use(authOnly)
 	r.Get("/:id", oh.FindOrderByID)
 	r.Get("/buyer/my-orders", oh.FindOrdersByBuyerID)
 	r.Get("/seller/my-orders", oh.FindOrdersBySellerID)
@@ -142,6 +177,8 @@ func orderRouter(base_url string, r fiber.Router) {
 func reviewRouter(base_url string, r fiber.Router) {
 	rh := handler.NewReviewHandler(base_url)
 	r.Get("/health-check", rh.HealthCheck)
+
+	r.Use(authOnly)
 	r.Get("/seller/:sellerId", rh.FindSellerReviews)
 	r.Post("", rh.Add)
 	r.Patch("/:reviewId", rh.Update)

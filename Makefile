@@ -22,6 +22,13 @@ proto-notification:
 	--go-grpc_out=services/common/genproto/notification \
 	--go-grpc_opt=paths=source_relative \
 
+proto-chat:
+	@protoc \
+	--proto_path=protobuf "protobuf/chat.proto" \
+	--go_out=services/common/genproto/chat \
+	--go_opt=paths=source_relative \
+	--go-grpc_out=services/common/genproto/chat \
+	--go-grpc_opt=paths=source_relative \
 
 run-auth:
 	@go run ./services/3-auth/*.go

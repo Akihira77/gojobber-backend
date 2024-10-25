@@ -32,7 +32,6 @@ func MainRouter(app *fiber.App, db *gorm.DB, cld *util.Cloudinary, ccs *handler.
 	as := service.NewAuthService(db)
 	ah := handler.NewAuthHttpHandler(as, cld, ccs)
 
-	api.Get("/user-info", authOnly, ah.GetUserInfo)
 	api.Post("/signin", ah.SignIn)
 	api.Post("/signup", ah.SignUp)
 	api.Patch("/forgot-password/:email", ah.SendForgotPasswordURL)
@@ -40,6 +39,7 @@ func MainRouter(app *fiber.App, db *gorm.DB, cld *util.Cloudinary, ccs *handler.
 
 	api.Use(authOnly)
 
+	api.Get("/user-info", ah.GetUserInfo)
 	api.Get("/refresh-token/:username", ah.RefreshToken)
 	api.Post("/send-verification-email", ah.SendVerifyEmailURL)
 	api.Patch("/verify-email/:token", ah.VerifyEmail)

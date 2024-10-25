@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/Akihira77/gojobber/services/1-gateway/types"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 )
@@ -50,6 +51,12 @@ func WsUpgrade(app fiber.Router) {
 		log.Println("Client make a websocket upgrade request")
 
 		if websocket.IsWebSocketUpgrade(c) {
+			userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
+			if !ok {
+				return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
+			}
+
+			c.Locals("current_user", userInfo)
 			return c.Next()
 		}
 
@@ -58,17 +65,23 @@ func WsUpgrade(app fiber.Router) {
 
 	go runHub()
 
-	app.Get("/ws/:userId", websocket.New(func(c *websocket.Conn) {
+	app.Get("/ws", websocket.New(func(c *websocket.Conn) {
+		u, ok := c.Locals("current_user").(*types.JWTClaims)
+		if !ok {
+			log.Println("current_user is invalid", u)
+			return
+		}
+
 		defer func() {
 			unregister <- wsReg{
-				userId: c.Params("userId"),
+				userId: u.UserID,
 				wsConn: c,
 			}
 			c.Close()
 		}()
 
 		register <- wsReg{
-			userId: c.Params("userId"),
+			userId: u.UserID,
 			wsConn: c,
 		}
 
@@ -92,11 +105,18 @@ func WsUpgrade(app fiber.Router) {
 			targetConn, err := getClient(msg.ReceiverID)
 			if err != nil {
 				log.Printf("Sending message to [%s] error:\n+%v", msg.ReceiverID, err)
-				c.Conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Failed sending message to [%s]", msg.ReceiverID)))
+				err = c.Conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Failed sending message to [%s]", msg.ReceiverID)))
+				if err != nil {
+					log.Println("WebSocket writing message error", err)
+				}
+
 				continue
 			}
 
-			targetConn.wsConn.WriteMessage(websocket.BinaryMessage, []byte(msg.Message))
+			err = targetConn.wsConn.WriteMessage(websocket.BinaryMessage, []byte(msg.Message))
+			if err != nil {
+				log.Println("WebSocket writing message error", err)
+			}
 			log.Println("message from ws connection", message)
 		}
 	}))
