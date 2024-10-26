@@ -33,7 +33,7 @@ func MainRouter(db *gorm.DB, cld *util.Cloudinary, app *fiber.App, ccs *handler.
 	api.Get("/id/:id", gigHandler.FindGigByID)
 	api.Get("/search/:page/:size", gigHandler.GigQuerySearch)
 	api.Get("/category/:category/:page/:size", gigHandler.FindGigByCategory)
-	api.Get("/popular", gigHandler.GetPopularGigs)
+	api.Get("/popular/:page/:size", gigHandler.GetPopularGigs)
 	api.Get("/similar/:gigId/:page/:size", gigHandler.FindSimilarGigs)
 
 	api.Use(authOnly)

@@ -84,11 +84,11 @@ func (ah *AuthHttpHandler) SignIn(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "signin failed")
 	}
 
-	c.Cookie(&fiber.Cookie{
-		Name:    "token",
-		Value:   token,
-		Expires: time.Now().Add(1 * time.Hour),
-	})
+	// c.Cookie(&fiber.Cookie{
+	// 	Name:    "token",
+	// 	Value:   token,
+	// 	Expires: time.Now().Add(1 * time.Hour),
+	// })
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"user": types.AuthExcludePassword{
 			ID:             u.ID,
@@ -146,14 +146,14 @@ func (ah *AuthHttpHandler) SignUp(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "user already exists")
 	}
 
-	data.File, err = formHeader.Open()
+	data.Avatar, err = formHeader.Open()
 	if err != nil {
 		log.Printf("signup error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "failed reading avatar file")
 	}
 
 	str := util.RandomStr(32)
-	uploadResult, err := ah.cld.UploadImg(ctx, data.File, str)
+	uploadResult, err := ah.cld.UploadImg(ctx, data.Avatar, str)
 	if err != nil {
 		log.Printf("signup error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "failed upload file")

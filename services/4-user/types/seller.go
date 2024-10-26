@@ -53,7 +53,7 @@ type EducationDTO struct {
 	Title      string `json:"title" validate:"required"`
 	Major      string `json:"major" validate:"required"`
 	University string `json:"university" validate:"required"`
-	Country    string `json:"country" validate:"required"`
+	Country    string `json:"country" validate:"required,alpha"`
 }
 
 type Experience struct {
@@ -80,7 +80,7 @@ type ExperienceDTO struct {
 type CreateSellerDTO struct {
 	FullName        string           `json:"fullName" validate:"required"`
 	Bio             string           `json:"bio" validate:"required"`
-	Languages       []Language       `json:"languages" validate:"required"`
+	Languages       []Language       `json:"languages" validate:"required,min=1"`
 	Skills          []Skill          `json:"skills" validate:"required,min=1"`
 	Certificates    []CertificateDTO `json:"certificates" validate:"required,min=1"`
 	Educations      []EducationDTO   `json:"educations" validate:"required,min=1"`
@@ -146,11 +146,11 @@ type SellerDTO struct {
 type UpdateSellerDTO struct {
 	FullName     string           `json:"fullName" validate:"required"`
 	Bio          string           `json:"bio" validate:"required"`
-	Languages    []Language       `json:"languages" validate:"required"`
-	Skills       []Skill          `json:"skills" validate:"required"`
-	Certificates []CertificateDTO `json:"certificates" validate:"required"`
-	Educations   []EducationDTO   `json:"educations" validate:"required"`
-	Experiences  []ExperienceDTO  `json:"experiences" validate:"required"`
+	Languages    []Language       `json:"languages" validate:"required,min=1"`
+	Skills       []Skill          `json:"skills" validate:"required,min=1"`
+	Certificates []CertificateDTO `json:"certificates" validate:"required,min=1"`
+	Educations   []EducationDTO   `json:"educations" validate:"required,min=1"`
+	Experiences  []ExperienceDTO  `json:"experiences" validate:"required,min=1"`
 }
 
 func ApplyDBSetup(db *gorm.DB) error {

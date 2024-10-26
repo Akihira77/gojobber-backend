@@ -1,6 +1,7 @@
 package util
 
 import (
+	"database/sql"
 	"fmt"
 	"math/rand"
 	"mime/multipart"
@@ -58,4 +59,11 @@ func CustomValidationErrors(err error) []types.ErrorResult {
 	}
 
 	return errs
+}
+
+func NewNullString(s string) sql.NullString {
+	return sql.NullString{
+		String: s,
+		Valid:  true,
+	}
 }

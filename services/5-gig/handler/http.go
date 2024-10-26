@@ -293,7 +293,14 @@ func (gh *GigHandler) GetPopularGigs(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 1*time.Second)
 	defer cancel()
 
-	gigs, err := gh.gigSvc.GetPopularGigs(ctx)
+	var p types.GigSearchParams
+	err := c.ParamsParser(&p)
+	if err != nil {
+		log.Println("find similar gigs", err)
+		return fiber.NewError(http.StatusBadRequest, "searching error")
+	}
+
+	gigs, err := gh.gigSvc.GetPopularGigs(ctx, &p)
 	if err != nil {
 		log.Println("get popular gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")

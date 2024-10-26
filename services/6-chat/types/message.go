@@ -30,8 +30,8 @@ func (p OfferStatus) Value() (driver.Value, error) {
 
 type Offer struct {
 	GigTitle             string      `json:"gigTitle" form:"gigTitle" validate:"required"`
-	Price                uint        `json:"price" form:"price" validate:"required"`
-	ExpectedDeliveryDays uint        `json:"expectedDeliveryDays" form:"expectedDeliveryDays" validate:"required"`
+	Price                uint        `json:"price" form:"price" validate:"required,gt=0"`
+	ExpectedDeliveryDays uint        `json:"expectedDeliveryDays" form:"expectedDeliveryDays" validate:"required,gt=0,lte=365"`
 	Description          string      `json:"description" form:"description"`
 	Status               OfferStatus `json:"status" gorm:"not null;"`
 	CreatedAt            time.Time   `json:"createdAt" gorm:"not null;"`
@@ -75,16 +75,6 @@ type MessageDTO struct {
 	Unread    bool      `json:"unread"`
 	CreatedAt time.Time `json:"createdAt"`
 	SenderID  string    `json:"senderId"`
-}
-
-type UserMessage struct {
-	UserOneID             string    `json:"userOneId"`
-	UserOneName           string    `json:"userOneName"`
-	UserOneProfilePicture string    `json:"userOneProfilePicture"`
-	UserTwoID             string    `json:"userTwoId"`
-	UserTwoName           string    `json:"userTwoName"`
-	UserTwoProfilePicture string    `json:"userTwoProfilePicture"`
-	Messages              []Message `json:"messages"`
 }
 
 type CreateMessageDTO struct {

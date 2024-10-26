@@ -35,33 +35,6 @@ func (ah *AuthHandler) HealthCheck(c *fiber.Ctx) error {
 
 }
 
-func (ah *AuthHandler) FindGigByID(c *fiber.Ctx) error {
-	route := ah.base_url + fmt.Sprintf("/api/v1/auths/search/gig/%s", c.Params("id"))
-	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
-	if len(errs) > 0 {
-		fmt.Println("AUTH - find gig by id error", errs)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"errs": errs,
-		})
-	}
-
-	return c.Status(statusCode).Send(body)
-}
-
-func (ah *AuthHandler) FindGigByQuery(c *fiber.Ctx) error {
-	query := fmt.Sprintf("query=%v&max=%v&delivery_time=%v", c.Query("query"), c.QueryInt("max"), c.QueryInt("delivery_time"))
-	route := ah.base_url + fmt.Sprintf("/api/v1/auths/search/gig/%s/%s?%s", c.Params("from"), c.Params("size"), query)
-	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
-	if len(errs) > 0 {
-		fmt.Println("AUTH - find gig by query error", errs)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"errs": errs,
-		})
-	}
-
-	return c.Status(statusCode).Send(body)
-}
-
 func (ah *AuthHandler) SignIn(c *fiber.Ctx) error {
 	route := ah.base_url + fmt.Sprintf("/api/v1/auths/signin")
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
@@ -78,17 +51,17 @@ func (ah *AuthHandler) SignIn(c *fiber.Ctx) error {
 
 	var res Response
 	err := json.Unmarshal(body, &res)
-	if err == nil || len(body) > 0 {
-		c.Cookie(&fiber.Cookie{
-			Name:    "token",
-			Value:   res.Token,
-			Expires: time.Now().Add(1 * time.Hour),
-		})
-
-		return c.Status(statusCode).Send(body)
+	if err != nil {
+		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened.")
 	}
 
-	return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened.")
+	c.Cookie(&fiber.Cookie{
+		Name:    "token",
+		Value:   res.Token,
+		Expires: time.Now().Add(1 * time.Hour),
+	})
+
+	return c.Status(statusCode).Send(body)
 }
 
 func (ah *AuthHandler) SignUp(c *fiber.Ctx) error {

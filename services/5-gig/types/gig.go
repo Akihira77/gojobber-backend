@@ -128,10 +128,10 @@ type CreateGigDTO struct {
 	SubCategories        pq.StringArray `json:"subCategories" form:"subCategories" validate:"required,min=1"`
 	Tags                 pq.StringArray `json:"tags" form:"tags" validate:"required,min=1"`
 	Active               bool           `json:"active" form:"active" validate:"required"`
-	ExpectedDeliveryDays int            `json:"expectedDeliveryDays" form:"expectedDeliveryDays" validate:"required"`
-	Price                float64        `json:"price" form:"price" validate:"required"`
+	ExpectedDeliveryDays int            `json:"expectedDeliveryDays" form:"expectedDeliveryDays" validate:"required,lte=365,gt=0"`
+	Price                float64        `json:"price" form:"price" validate:"required,gt=0"`
+	ImageFile            multipart.File `json:"imageFile,omitempty" form:"imageFile"`
 	CoverImage           string         `json:"coverImage"`
-	ImageFile            multipart.File
 }
 
 type UpdateGigDTO struct {
@@ -141,10 +141,10 @@ type UpdateGigDTO struct {
 	Category             string         `json:"category" form:"category" validate:"required"`
 	SubCategories        pq.StringArray `json:"subCategories" form:"subCategories" validate:"required,min=1"`
 	Tags                 pq.StringArray `json:"tags" form:"tags" validate:"required,min=1"`
-	ExpectedDeliveryDays int            `json:"expectedDeliveryDays" form:"expectedDeliveryDays" validate:"required"`
-	Price                float64        `json:"price" form:"price" validate:"required"`
+	ExpectedDeliveryDays int            `json:"expectedDeliveryDays" form:"expectedDeliveryDays" validate:"required,lte=365,gt=0"`
+	Price                float64        `json:"price" form:"price" validate:"required,gt=0"`
+	ImageFile            multipart.File `json:"imageFile,omitempty" form:"imageFile"`
 	CoverImage           string         `json:"coverImage"`
-	ImageFile            multipart.File
 }
 
 type GigSearchQueryResult struct {

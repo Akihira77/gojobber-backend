@@ -20,11 +20,11 @@ type GigServiceImpl interface {
 	GigQuerySearch(ctx context.Context, p *types.GigSearchParams, q *types.GigSearchQuery) (types.GigSearchQueryResult, error)
 	FindSellerGigs(ctx context.Context, gigStatus bool, sellerId string, p *types.GigSearchParams) ([]types.GigDTO, error)
 	FindGigByCategory(ctx context.Context, category string, p *types.GigSearchParams) ([]types.GigDTO, error)
-	GetPopularGigs(ctx context.Context) ([]types.GigDTO, error)
+	GetPopularGigs(ctx context.Context, p *types.GigSearchParams) ([]types.GigDTO, error)
 	FindSimilarGigs(ctx context.Context, p *types.GigSearchParams, data *types.GigDTO) ([]types.GigDTO, error)
 	Create(ctx context.Context, data *types.CreateGigDTO) (*types.GigDTO, error)
 	Update(ctx context.Context, data *types.UpdateGigDTO) (*types.GigDTO, error)
-	ChangeGigStatus(ctx context.Context, gigId string, gigStatus bool) error
+	ChangeGigStatus(ctx context.Context, gigId string, s bool) error
 	DeleteGigByID(ctx context.Context, gigId string) error
 	FindAndMapSellerInGigs(ctx context.Context, userGrpcClient user.UserServiceClient, gigs []types.GigDTO) ([]types.GigSellerDTO, error)
 }
@@ -91,7 +91,7 @@ func (gs *GigService) FindAndMapSellerInGigs(ctx context.Context, userGrpcClient
 	for err := range errCh {
 		if err != nil {
 			fmt.Println(err)
-			return nil, err
+			return result, err
 		}
 	}
 
@@ -117,23 +117,15 @@ func (gs *GigService) FindGigBySellerIDAndGigID(ctx context.Context, sellerId, i
 func (gs *GigService) GigQuerySearch(ctx context.Context, p *types.GigSearchParams, q *types.GigSearchQuery) (types.GigSearchQueryResult, error) {
 	var gigs []types.GigDTO
 
-	sanitizeNumber := func(num, minn, maxn int) int {
-		if num < minn {
-			num = minn
+	sanitizeNumber := func(num int) int {
+		if num <= 0 || num > math.MaxInt32 {
+			num = math.MaxInt32
 		}
-
-		if num > maxn {
-			num = maxn
-		}
-
 		return num
 	}
-	// if max price parameter is too high
-	q.Max = sanitizeNumber(q.Max, 0, math.MaxInt32)
-	if q.Max == 0 {
-		q.Max = math.MaxInt32
-	}
-	q.DeliveryTime = sanitizeNumber(q.DeliveryTime, 0, 365)
+	//HACK: if the number is too high or too low
+	q.Max = sanitizeNumber(q.Max)
+	q.DeliveryTime = sanitizeNumber(q.DeliveryTime)
 
 	var total int64
 	query := gs.db.
@@ -366,14 +358,14 @@ func (gs *GigService) FindSimilarGigs(ctx context.Context, p *types.GigSearchPar
 	return gigs, result.Error
 }
 
-// TODO: ADD PAGINATION
-func (gs *GigService) GetPopularGigs(ctx context.Context) ([]types.GigDTO, error) {
+func (gs *GigService) GetPopularGigs(ctx context.Context, p *types.GigSearchParams) ([]types.GigDTO, error) {
 	var gigs []types.GigDTO
 	result := gs.db.
 		WithContext(ctx).
 		Model(&types.Gig{}).
 		Order("rating_sum DESC").
-		Limit(20).
+		Offset((p.Page - 1) * p.Size).
+		Limit(p.Size).
 		Find(&gigs)
 
 	return gigs, result.Error
@@ -424,12 +416,12 @@ func (gs *GigService) Update(ctx context.Context, data *types.UpdateGigDTO) (*ty
 	}, result.Error
 }
 
-func (gs *GigService) ChangeGigStatus(ctx context.Context, gigID string, gigStatus bool) error {
+func (gs *GigService) ChangeGigStatus(ctx context.Context, gigID string, s bool) error {
 	result := gs.db.
 		WithContext(ctx).
 		Model(&types.Gig{}).
 		Where("id = ?", gigID).
-		Update("active", gigStatus)
+		Update("active", s)
 
 	return result.Error
 }

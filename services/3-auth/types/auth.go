@@ -36,26 +36,26 @@ type AuthExcludePassword struct {
 }
 
 type SignIn struct {
-	Username string `json:"username" validate:"required"`
-	Password string `json:"password" validate:"required"`
+	Username string `json:"username" validate:"required,alphanum"`
+	Password string `json:"password" validate:"required,alphanum"`
 }
 
 type SignUp struct {
-	Username        string `json:"username" form:"username" validate:"required"`
-	Password        string `json:"password" form:"password" validate:"required,min=8,max=16"`
-	Country         string `json:"country" form:"country" validate:"required"`
-	Email           string `json:"email" form:"email" validate:"required,email"`
-	ProfilePicture  string `json:"profilePicture"`
-	File            multipart.File
-	ProfilePublicID string `json:"profilePublicId"`
+	Username        string         `json:"username" form:"username" validate:"required,alphanum"`
+	Password        string         `json:"password" form:"password" validate:"required,min=8,max=16,alphanum"`
+	Country         string         `json:"country" form:"country" validate:"required,alpha"`
+	Email           string         `json:"email" form:"email" validate:"required,email"`
+	ProfilePicture  string         `json:"profilePicture"`
+	Avatar          multipart.File `form:"avatar" validate:"required"`
+	ProfilePublicID string         `json:"profilePublicId"`
 }
 
 type ResetPassword struct {
-	Password        string `json:"password" validate:"required,min=8,max=16"`
-	ConfirmPassword string `json:"confirmPassword" validate:"required,min=8,max=16"`
+	Password        string `json:"password" validate:"required,min=8,max=16,alphanum"`
+	ConfirmPassword string `json:"confirmPassword" validate:"required,min=8,max=16,alphanum"`
 }
 
 type ChangePassword struct {
-	CurrentPassword string `json:"currentPassword" validate:"required,min=8,max=16"`
-	NewPassword     string `json:"newPassword" validate:"required,min=8,max=16"`
+	CurrentPassword string `json:"currentPassword" validate:"required,min=8,max=16,alphanum"`
+	NewPassword     string `json:"newPassword" validate:"required,min=8,max=16,alphanum"`
 }

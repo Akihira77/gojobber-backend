@@ -99,7 +99,7 @@ type CreateOrderDTO struct {
 	ServiceFee         uint   `json:"serviceFee"`
 	PaymentIntentID    string `json:"paymentIntentId"`
 	StripeClientSecret string `json:"stripeClientSecret"`
-	Deadline           int    `json:"deadline" validate:"required"`
+	Deadline           int    `json:"deadline" validate:"required,gt=0,lte=365"`
 	MessageID          string `json:"messageId,omitempty"`
 }
 

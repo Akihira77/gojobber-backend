@@ -8,8 +8,3 @@ type JWTClaims struct {
 	Email    string `json:"email"`
 	Username string `json:"username"`
 }
-
-type RabbitMQResponse[T any] struct {
-	Success bool `json:"success"`
-	Data    T    `json:"data"`
-}

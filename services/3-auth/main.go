@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/Akihira77/gojobber/services/3-auth/handler"
-	"github.com/Akihira77/gojobber/services/3-auth/queue"
 	"github.com/Akihira77/gojobber/services/3-auth/types"
 	"github.com/Akihira77/gojobber/services/3-auth/util"
 	"github.com/joho/godotenv"
@@ -18,7 +17,6 @@ func main() {
 	}
 
 	db, _ := NewStore()
-	_ = queue.NewConnection(db)
 	cld := util.NewCloudinary()
 
 	db.Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)

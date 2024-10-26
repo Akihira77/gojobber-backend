@@ -11,7 +11,7 @@ type Review struct {
 	ID        uuid.UUID `json:"id" gorm:"primaryKey;type:uuid;default:uuid_generate_v4()"`
 	SellerID  string    `json:"sellerId" gorm:"not null;"`
 	BuyerID   string    `json:"buyerId" gorm:"not null;" validate:"required"`
-	Rating    uint      `json:"rating" gorm:"not null;" validate:"required"`
+	Rating    uint      `json:"rating" gorm:"not null;" validate:"required,gte=1,lte=5"`
 	Review    string    `json:"review" gorm:"not null;" validate:"required"`
 	CreatedAt time.Time `json:"createdAt" gorm:"not null;"`
 }
