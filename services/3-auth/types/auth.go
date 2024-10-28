@@ -46,7 +46,7 @@ type SignUp struct {
 	Country         string         `json:"country" form:"country" validate:"required,alpha"`
 	Email           string         `json:"email" form:"email" validate:"required,email"`
 	ProfilePicture  string         `json:"profilePicture"`
-	Avatar          multipart.File `form:"avatar" validate:"required"`
+	Avatar          multipart.File `json:"avatar" form:"avatar"`
 	ProfilePublicID string         `json:"profilePublicId"`
 }
 

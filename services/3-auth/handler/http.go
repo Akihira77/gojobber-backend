@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	svc "github.com/Akihira77/gojobber/services/3-auth/service"
@@ -14,6 +15,7 @@ import (
 	"github.com/Akihira77/gojobber/services/3-auth/util"
 	"github.com/Akihira77/gojobber/services/common/genproto/notification"
 	"github.com/Akihira77/gojobber/services/common/genproto/user"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -84,11 +86,6 @@ func (ah *AuthHttpHandler) SignIn(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "signin failed")
 	}
 
-	// c.Cookie(&fiber.Cookie{
-	// 	Name:    "token",
-	// 	Value:   token,
-	// 	Expires: time.Now().Add(1 * time.Hour),
-	// })
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"user": types.AuthExcludePassword{
 			ID:             u.ID,
@@ -139,52 +136,74 @@ func (ah *AuthHttpHandler) SignUp(c *fiber.Ctx) error {
 	u, err := ah.authSvc.FindUserByUsernameOrEmail(ctx, data.Username)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Printf("signup error:\n%+v", err)
-		return fiber.ErrInternalServerError
+		return fiber.NewError(http.StatusInternalServerError, "Error while validating your data")
 	}
 
 	if u.ID != "" {
 		return fiber.NewError(http.StatusBadRequest, "user already exists")
 	}
 
-	data.Avatar, err = formHeader.Open()
-	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "failed reading avatar file")
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	var uploadResult *uploader.UploadResult
+
+	wg.Add(1)
+	go func() {
+		log.Println("Upload Image")
+		defer wg.Done()
+
+		data.Avatar, err = formHeader.Open()
+		if err != nil {
+			log.Printf("error opening avatar file:\n%+v", err)
+			errCh <- fmt.Errorf("failed reading avatar file")
+			return
+		}
+
+		str := util.RandomStr(32)
+		uploadResult, err = ah.cld.UploadImg(ctx, data.Avatar, str)
+		if err != nil {
+			log.Printf("error saving avatar file:\n%+v", err)
+			errCh <- fmt.Errorf("failed upload file")
+			return
+		}
+
+		errCh <- nil
+		return
+	}()
+
+	printErrorAndDestroyImg := func(err error) *fiber.Error {
+		if err != nil {
+			log.Printf("signup error:\n%+v", err)
+			go ah.cld.Destroy(context.TODO(), uploadResult.PublicID)
+			return fiber.NewError(http.StatusInternalServerError, "Error while saving your data")
+		}
+
+		return nil
 	}
 
-	str := util.RandomStr(32)
-	uploadResult, err := ah.cld.UploadImg(ctx, data.Avatar, str)
-	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "failed upload file")
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+	for err := range errCh {
+		printErrorAndDestroyImg(err)
 	}
 
-	data.ProfilePicture = uploadResult.SecureURL
-	data.ProfilePublicID = uploadResult.PublicID
 	cc, err := ah.grpcClient.GetClient("USER_SERVICE")
-	if err != nil {
-		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
-	}
+	printErrorAndDestroyImg(err)
 
 	userGrpcClient := user.NewUserServiceClient(cc)
+	data.ProfilePicture = uploadResult.SecureURL
+	data.ProfilePublicID = uploadResult.PublicID
 	result, err := ah.authSvc.Create(ctx, data, userGrpcClient)
-	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		ah.cld.Destroy(context.Background(), uploadResult.PublicID)
-		return fiber.NewError(http.StatusBadRequest, "signup failed")
-	}
+	printErrorAndDestroyImg(err)
 
 	token, err := util.SigningJWT(os.Getenv("JWT_SECRET"), result.ID, result.Email, result.Username)
 	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "error generating JWT")
+		fmt.Printf("signin error: \n%+v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while generating response")
 	}
 
-	c.Cookie(&fiber.Cookie{
-		Name:    "token",
-		Value:   token,
-		Expires: time.Now().Add(1 * time.Hour),
-	})
 	return c.Status(http.StatusCreated).JSON(fiber.Map{
 		"user": types.AuthExcludePassword{
 			ID:             result.ID,
@@ -211,11 +230,6 @@ func (ah *AuthHttpHandler) RefreshToken(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "failed refresh the token")
 	}
 
-	c.Cookie(&fiber.Cookie{
-		Name:    "token",
-		Value:   token,
-		Expires: time.Now().Add(1 * time.Hour),
-	})
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"token": token,
 		"user":  userInfo,
@@ -238,7 +252,7 @@ func (ah *AuthHttpHandler) VerifyEmail(c *fiber.Ctx) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fiber.NewError(http.StatusNotFound, "user did not found")
 		}
-		return fiber.ErrInternalServerError
+		return fiber.NewError(http.StatusInternalServerError, "Error while searching your data")
 	}
 
 	result, err := ah.authSvc.UpdateEmailVerification(ctx, userInfo.UserID, true, "")
@@ -277,17 +291,15 @@ func (ah *AuthHttpHandler) SendVerifyEmailURL(c *fiber.Ctx) error {
 	go func() {
 		verifURL := fmt.Sprintf("%s/confirm_email?v_token=%s", os.Getenv("CLIENT_URL"), randStr)
 		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
-		notificationGrpcClient.UserVerifyingEmail(context.TODO(), &notification.VerifyingEmailRequest{
+		_, err = notificationGrpcClient.UserVerifyingEmail(context.TODO(), &notification.VerifyingEmailRequest{
 			ReceiverEmail:    userInfo.Email,
 			HtmlTemplateName: "verifyEmail",
 			VerifyLink:       verifURL,
 		})
+		if err != nil {
+			log.Printf("Error sending notification email:\n%+v", err)
+		}
 	}()
-
-	// if err != nil {
-	// 	fmt.Printf("sendforgotpasswordurl error:\n%+v", err)
-	// 	return fiber.NewError(http.StatusInternalServerError, "Error sending verify email URL to your email")
-	// }
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"message": "verify email URL has been send to your email",
@@ -324,18 +336,16 @@ func (ah *AuthHttpHandler) SendForgotPasswordURL(c *fiber.Ctx) error {
 	go func() {
 		resetPassURL := fmt.Sprintf("%s/reset-password?token=%s", os.Getenv("CLIENT_URL"), randStr)
 		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
-		notificationGrpcClient.UserForgotPassword(context.TODO(), &notification.ForgotPasswordRequest{
+		_, err = notificationGrpcClient.UserForgotPassword(context.TODO(), &notification.ForgotPasswordRequest{
 			ReceiverEmail:    user.Email,
 			HtmlTemplateName: "resetPassword",
 			Username:         user.Username,
 			ResetLink:        resetPassURL,
 		})
+		if err != nil {
+			fmt.Printf("sendforgotpasswordurl error:\n%+v", err)
+		}
 	}()
-
-	// if err != nil {
-	// 	fmt.Printf("sendforgotpasswordurl error:\n%+v", err)
-	// 	return fiber.NewError(http.StatusInternalServerError, "Error sending forgot password URL to your email")
-	// }
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"message": "email has been sent to your email",
@@ -399,18 +409,15 @@ func (ah *AuthHttpHandler) ResetPassword(c *fiber.Ctx) error {
 
 	go func() {
 		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
-		notificationGrpcClient.UserSucessResetPassword(context.TODO(), &notification.SuccessResetPasswordRequest{
+		_, err = notificationGrpcClient.UserSucessResetPassword(context.TODO(), &notification.SuccessResetPasswordRequest{
 			ReceiverEmail:    user.Email,
 			HtmlTemplateName: "resetPasswordSuccess",
 			Username:         user.Username,
 		})
-
+		if err != nil {
+			fmt.Printf("resetpasswordsuccess error:\n%+v", err)
+		}
 	}()
-
-	// if err != nil {
-	// 	fmt.Printf("resetpasswordsuccess error:\n%+v", err)
-	// 	return fiber.NewError(http.StatusInternalServerError, "Error sending email")
-	// }
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"message": "password reseted",
@@ -439,7 +446,7 @@ func (ah *AuthHttpHandler) ChangePassword(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 
-	user, err := ah.authSvc.FindUserByIDIncPassword(ctx, userInfo.UserID)
+	user, err := ah.authSvc.FindUserByUsernameOrEmailIncPassword(ctx, userInfo.Email)
 	if err != nil {
 		fmt.Printf("changepassword error:\n%+v", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) {

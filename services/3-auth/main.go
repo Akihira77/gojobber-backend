@@ -19,8 +19,9 @@ func main() {
 	db, _ := NewStore()
 	cld := util.NewCloudinary()
 
-	db.Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
-	db.Exec(`CREATE EXTENSION IF NOT EXISTS "pg_trgm";`)
+	db.Debug().Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
+	db.Debug().Exec(`CREATE EXTENSION IF NOT EXISTS "pg_trgm";`)
+	db.Debug().Exec(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`)
 	// db.Debug().Migrator().DropTable(&types.Auth{})
 	db.AutoMigrate(&types.Auth{})
 	ccs := handler.NewGRPCClients()
