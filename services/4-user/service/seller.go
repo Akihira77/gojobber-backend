@@ -460,10 +460,9 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		// Wait for all goroutines to finish
 		go func() {
 			wg.Wait()
-			close(errCh) // Close the error channel after all goroutines are done
+			close(errCh)
 		}()
 
 		for err := range errCh {
@@ -496,6 +495,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 
 func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.Buyer, data *types.CreateSellerDTO) (*types.SellerDTO, error) {
 	tx := ss.db.
+		Debug().
 		WithContext(ctx).
 		Begin(&sql.TxOptions{})
 

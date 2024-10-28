@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/Akihira77/gojobber/services/3-auth/types"
@@ -40,12 +39,7 @@ func (as *AuthService) FindUserByUsernameOrEmail(ctx context.Context, str string
 	var user types.AuthExcludePassword
 	result := as.db.WithContext(ctx).
 		Model(&types.Auth{}).
-		Where("pgp_sym_decrypt(username::BYTEA, ?) = ? OR pgp_sym_decrypt(email::BYTEA, ?) = ?",
-			os.Getenv("PGP_SYM_KEY"),
-			str,
-			os.Getenv("PGP_SYM_KEY"),
-			str,
-		).
+		Where("username = ? OR email = ?", str, str).
 		First(&user)
 	return &user, result.Error
 }
@@ -54,12 +48,7 @@ func (as *AuthService) FindUserByUsernameOrEmailIncPassword(ctx context.Context,
 	var user types.Auth
 	result := as.db.WithContext(ctx).
 		Model(&types.Auth{}).
-		Where("pgp_sym_decrypt(username::BYTEA, ?) = ? OR pgp_sym_decrypt(email::BYTEA, ?) = ?",
-			os.Getenv("PGP_SYM_KEY"),
-			str,
-			os.Getenv("PGP_SYM_KEY"),
-			str,
-		).
+		Where("username = ? OR email = ?", str, str).
 		First(&user)
 	return &user, result.Error
 }
@@ -70,60 +59,59 @@ func (as *AuthService) Create(ctx context.Context, u *types.SignUp, userGrpcClie
 		return nil, fmt.Errorf("hashing password error: %v", err)
 	}
 
-	tx := as.db.
-		Debug().
-		WithContext(ctx).
+	auth := &types.Auth{
+		ID:              util.RandomStr(64),
+		Username:        u.Username,
+		Email:           u.Email,
+		Password:        hashPass,
+		Country:         u.Country,
+		ProfilePicture:  u.ProfilePicture,
+		ProfilePublicID: u.ProfilePublicID,
+		CreatedAt:       time.Now(),
+	}
+
+	tx := as.db.WithContext(ctx).
 		Model(&types.Auth{}).
 		Begin()
 
-	var result types.AuthExcludePassword
-	err = tx.Raw(`
-        INSERT INTO auths (id, username, email, password, country, profile_picture, profile_public_id, created_at)
-        VALUES(
-            ?,
-            pgp_sym_encrypt(?, ?),
-            pgp_sym_encrypt(?, ?),
-            ?,
-            ?,
-            ?,
-            ?,
-            ?
-        )
-        RETURNING *
-        `,
-		util.RandomStr(64),
-		u.Username,
-		os.Getenv("PGP_SYM_KEY"),
-		u.Email,
-		os.Getenv("PGP_SYM_KEY"),
-		hashPass,
-		u.Country,
-		u.ProfilePicture,
-		u.ProfilePublicID,
-		time.Now(),
-	).
-		Scan(&result).
-		Error
-	if err != nil {
+	if err := tx.Create(auth).Error; err != nil {
 		tx.Rollback()
 		return &types.AuthExcludePassword{}, err
 	}
 
 	_, err = userGrpcClient.SaveBuyerData(ctx, &user.SaveBuyerRequest{
-		Id:             result.ID,
-		Username:       result.Username,
-		Email:          result.Email,
-		Country:        result.Country,
-		ProfilePicture: result.ProfilePicture,
+		Id:             auth.ID,
+		Username:       auth.Username,
+		Email:          auth.Email,
+		Country:        auth.Country,
+		ProfilePicture: auth.ProfilePicture,
 		IsSeller:       false,
-		CreatedAt:      timestamppb.New(*result.CreatedAt),
+		CreatedAt:      timestamppb.New(auth.CreatedAt),
 	})
+
 	if err != nil {
 		tx.Rollback()
 		return &types.AuthExcludePassword{}, err
 	}
 
-	return &result, tx.Commit().Error
+	var result types.AuthExcludePassword
+	err = tx.
+		Model(&types.Auth{}).
+		Where("id = ?", auth.ID).
+		First(&result).Error
+	if err != nil {
+		tx.Rollback()
+		return &types.AuthExcludePassword{}, err
+	}
+
+	return &types.AuthExcludePassword{
+		ID:              result.ID,
+		Username:        result.Username,
+		Email:           result.Email,
+		Country:         result.Country,
+		ProfilePicture:  result.ProfilePicture,
+		ProfilePublicID: result.ProfilePublicID,
+	}, tx.Commit().Error
 }
 
 func (as *AuthService) FindUserByID(ctx context.Context, id string) (*types.AuthExcludePassword, error) {

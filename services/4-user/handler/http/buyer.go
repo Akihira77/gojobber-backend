@@ -31,7 +31,7 @@ func (bh *BuyerHandler) GetMyBuyerInfo(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "invalid data. Please re-signin")
 	}
 
-	myInfo, err := bh.buyerSvc.FindBuyerByEmailOrUsername(ctx, currUser.Email)
+	myInfo, err := bh.buyerSvc.FindBuyerByID(ctx, currUser.UserID)
 	if err != nil {
 		if errors.Is(gorm.ErrRecordNotFound, err) {
 			return fiber.NewError(http.StatusNotFound, "your buyer information is not found. Please re-signin")
