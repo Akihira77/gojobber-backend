@@ -15,6 +15,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/stripe/stripe-go/v80 v80.2.0
 	golang.org/x/crypto v0.26.0
+	golang.org/x/oauth2 v0.23.0
 	google.golang.org/grpc v1.67.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
@@ -23,6 +24,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/creasty/defaults v1.7.0 // indirect
 	github.com/fasthttp/websocket v1.5.8 // indirect

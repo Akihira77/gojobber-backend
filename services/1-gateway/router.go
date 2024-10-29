@@ -88,8 +88,14 @@ func authRouter(base_url string, r fiber.Router) {
 	ah := handler.NewAuthHandler(base_url)
 	r.Get("/health-check", ah.HealthCheck)
 
-	r.Post("/signin", ah.SignIn)
-	r.Post("/signup", ah.SignUp)
+	r.Get("/google/:action", ah.AuthWithGoogle)
+
+	r.Get("/signup/google-callback", ah.SignUpWithGoogle)
+	r.Post("/signup", ah.SignUp).Name("signup")
+
+	r.Get("/signin/google-callback", ah.SignInWithGoogle)
+	r.Post("/signin", ah.SignIn).Name("signin")
+
 	r.Patch("/forgot-password/:email", ah.SendForgotPasswordURL)
 	r.Patch("/reset-password/:token", ah.ResetPassword)
 
@@ -122,14 +128,15 @@ func gigRouter(base_url string, r fiber.Router) {
 	gh := handler.NewGigHandler(base_url)
 	r.Get("/health-check", gh.HealthCheck)
 
-	r.Use(authOnly)
+	r.Get("/popular", gh.GetPopularGigs).Name("home")
 	r.Get("/id/:id", gh.FindGigByID)
-	r.Get("/sellers/active/:page/:size", gh.FindSellerActiveGigs)
-	r.Get("/sellers/inactive/:page/:size", gh.FindSellerInactiveGigs)
 	r.Get("/category/:category/:page/:size", gh.FindGigsByCategory)
-	r.Get("/popular", gh.GetPopularGigs)
 	r.Get("/similar/:gigId/:page/:size", gh.FindSimilarGigs)
 	r.Get("/search/:page/:size", gh.GigQuerySearch)
+
+	r.Use(authOnly)
+	r.Get("/sellers/active/:page/:size", gh.FindSellerActiveGigs)
+	r.Get("/sellers/inactive/:page/:size", gh.FindSellerInactiveGigs)
 	r.Post("", gh.CreateGig)
 	r.Put("/:sellerId/:gigId", gh.UpdateGig)
 	r.Patch("/update-status/:sellerId/:gigId", gh.ActivateGigStatus)

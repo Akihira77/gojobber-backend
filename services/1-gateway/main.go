@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Akihira77/gojobber/services/1-gateway/config"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -24,6 +25,8 @@ func main() {
 	}
 
 	port := os.Getenv("PORT")
+	config.NewGoogleAuthConfig(port)
+
 	app := fiber.New(fiber.Config{
 		BodyLimit:     5 * 1024 * 1024,
 		CaseSensitive: true,

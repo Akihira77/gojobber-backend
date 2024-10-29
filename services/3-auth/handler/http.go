@@ -74,13 +74,15 @@ func (ah *AuthHttpHandler) SignIn(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "signin failed")
 	}
 
-	err = util.CheckPasswordHash(data.Password, u.Password)
-	if err != nil {
-		fmt.Printf("signin error: \n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "password did not matched")
+	if c.Query("via") != "google" {
+		err = util.CheckPasswordHash(data.Password, u.Password)
+		if err != nil {
+			fmt.Printf("signin error: \n%+v", err)
+			return fiber.NewError(http.StatusBadRequest, "password did not matched")
+		}
 	}
 
-	token, err := util.SigningJWT(os.Getenv("JWT_SECRET"), u.ID, u.Email, u.Username)
+	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), u.ID, u.Email, u.Username)
 	if err != nil {
 		fmt.Printf("signin error: \n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "signin failed")
@@ -117,22 +119,6 @@ func (ah *AuthHttpHandler) SignUp(c *fiber.Ctx) error {
 		})
 	}
 
-	formHeader, err := c.FormFile("avatar")
-	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "failed reading avatar file")
-	}
-
-	if formHeader.Size > 2*1024*1024 {
-		log.Printf("signup error. File is too large")
-		return fiber.NewError(http.StatusBadRequest, "file is larger than 2MB")
-	}
-
-	if !util.ValidateImgExtension(formHeader) {
-		log.Println("signup error file type is unsupported")
-		return fiber.NewError(http.StatusBadRequest, "file type is unsupported")
-	}
-
 	u, err := ah.authSvc.FindUserByUsernameOrEmail(ctx, data.Username)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Printf("signup error:\n%+v", err)
@@ -143,64 +129,90 @@ func (ah *AuthHttpHandler) SignUp(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "user already exists")
 	}
 
-	errCh := make(chan error, 1)
-	var wg sync.WaitGroup
 	var uploadResult *uploader.UploadResult
-
-	wg.Add(1)
-	go func() {
-		log.Println("Upload Image")
-		defer wg.Done()
-
-		data.Avatar, err = formHeader.Open()
-		if err != nil {
-			log.Printf("error opening avatar file:\n%+v", err)
-			errCh <- fmt.Errorf("failed reading avatar file")
-			return
+	destroyUploadredResult := func() {
+		if uploadResult == nil || uploadResult.PublicID == "" {
+			go ah.cld.Destroy(context.TODO(), uploadResult.PublicID)
 		}
-
-		str := util.RandomStr(32)
-		uploadResult, err = ah.cld.UploadImg(ctx, data.Avatar, str)
-		if err != nil {
-			log.Printf("error saving avatar file:\n%+v", err)
-			errCh <- fmt.Errorf("failed upload file")
-			return
-		}
-
-		errCh <- nil
-		return
-	}()
-
-	printErrorAndDestroyImg := func(err error) *fiber.Error {
+	}
+	if data.ProfilePicture == "" {
+		formHeader, err := c.FormFile("avatar")
 		if err != nil {
 			log.Printf("signup error:\n%+v", err)
-			go ah.cld.Destroy(context.TODO(), uploadResult.PublicID)
-			return fiber.NewError(http.StatusInternalServerError, "Error while saving your data")
+			return fiber.NewError(http.StatusBadRequest, "failed reading avatar file")
 		}
 
-		return nil
-	}
+		if formHeader.Size > 2*1024*1024 {
+			log.Printf("signup error. File is too large")
+			return fiber.NewError(http.StatusBadRequest, "file is larger than 2MB")
+		}
 
-	go func() {
-		wg.Wait()
-		close(errCh)
-	}()
-	for err := range errCh {
-		printErrorAndDestroyImg(err)
+		if !util.ValidateImgExtension(formHeader) {
+			log.Println("signup error file type is unsupported")
+			return fiber.NewError(http.StatusBadRequest, "file type is unsupported")
+		}
+
+		errCh := make(chan error, 1)
+		var wg sync.WaitGroup
+
+		wg.Add(1)
+		go func() {
+			log.Println("Upload Image")
+			defer wg.Done()
+
+			data.Avatar, err = formHeader.Open()
+			if err != nil {
+				log.Printf("error opening avatar file:\n%+v", err)
+				errCh <- fmt.Errorf("failed reading avatar file")
+				return
+			}
+
+			str := util.RandomStr(32)
+			uploadResult, err = ah.cld.UploadImg(ctx, data.Avatar, str)
+			if err != nil {
+				log.Printf("error saving avatar file:\n%+v", err)
+				errCh <- fmt.Errorf("failed upload file")
+				return
+			}
+
+			errCh <- nil
+			return
+		}()
+
+		go func() {
+			wg.Wait()
+			close(errCh)
+		}()
+		for err := range errCh {
+			if err != nil {
+				log.Printf("signup error:\n%+v", err)
+				destroyUploadredResult()
+				return fiber.NewError(http.StatusInternalServerError, "Error while saving your data")
+			}
+		}
+
+		data.ProfilePicture = uploadResult.SecureURL
+		data.ProfilePublicID = uploadResult.PublicID
 	}
 
 	cc, err := ah.grpcClient.GetClient("USER_SERVICE")
-	printErrorAndDestroyImg(err)
+	if err != nil {
+		log.Printf("signup error:\n%+v", err)
+		destroyUploadredResult()
+		return fiber.NewError(http.StatusInternalServerError, "Error while saving your data")
+	}
 
 	userGrpcClient := user.NewUserServiceClient(cc)
-	data.ProfilePicture = uploadResult.SecureURL
-	data.ProfilePublicID = uploadResult.PublicID
 	result, err := ah.authSvc.Create(ctx, data, userGrpcClient)
-	printErrorAndDestroyImg(err)
-
-	token, err := util.SigningJWT(os.Getenv("JWT_SECRET"), result.ID, result.Email, result.Username)
 	if err != nil {
-		fmt.Printf("signin error: \n%+v", err)
+		log.Printf("signup error:\n%+v", err)
+		destroyUploadredResult()
+		return fiber.NewError(http.StatusInternalServerError, "Error while saving your data")
+	}
+
+	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), result.ID, result.Email, result.Username)
+	if err != nil {
+		fmt.Printf("signup error: \n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while generating response")
 	}
 
@@ -224,7 +236,7 @@ func (ah *AuthHttpHandler) RefreshToken(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 
-	token, err := util.SigningJWT(os.Getenv("JWT_SECRET"), userInfo.UserID, userInfo.Email, userInfo.Username)
+	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), userInfo.UserID, userInfo.Email, userInfo.Username)
 	if err != nil {
 		log.Printf("refreshtoken:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "failed refresh the token")

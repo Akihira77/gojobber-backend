@@ -11,7 +11,7 @@ type Auth struct {
 	Username               string         `json:"username" gorm:"index:idx_username,unique;not null"`
 	Password               string         `json:"password" gorm:"not null"`
 	Email                  string         `json:"email" gorm:"index:idx_email,unique;not null"`
-	ProfilePublicID        string         `json:"profilePublicId" gorm:"not null"`
+	ProfilePublicID        string         `json:"profilePublicId" gorm:"default:null;"`
 	Country                string         `json:"country" gorm:"not null"`
 	ProfilePicture         string         `json:"profilePicture" gorm:"not null"`
 	EmailVerificationToken sql.NullString `json:"emailVerificationToken"`
@@ -36,8 +36,8 @@ type AuthExcludePassword struct {
 }
 
 type SignIn struct {
-	Username string `json:"username" validate:"required,alphanum"`
-	Password string `json:"password" validate:"required,alphanum"`
+	Username string `json:"username" validate:"required"`
+	Password string `json:"password"`
 }
 
 type SignUp struct {
