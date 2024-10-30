@@ -89,13 +89,10 @@ func authRouter(base_url string, r fiber.Router) {
 	r.Get("/health-check", ah.HealthCheck)
 
 	r.Get("/google/:action", ah.AuthWithGoogle)
-
 	r.Get("/signup/google-callback", ah.SignUpWithGoogle)
 	r.Post("/signup", ah.SignUp).Name("signup")
-
 	r.Get("/signin/google-callback", ah.SignInWithGoogle)
 	r.Post("/signin", ah.SignIn).Name("signin")
-
 	r.Patch("/forgot-password/:email", ah.SendForgotPasswordURL)
 	r.Patch("/reset-password/:token", ah.ResetPassword)
 
