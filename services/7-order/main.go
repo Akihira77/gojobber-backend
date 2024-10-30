@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Akihira77/gojobber/services/7-order/handler"
+	"github.com/Akihira77/gojobber/services/7-order/types"
 	"github.com/Akihira77/gojobber/services/7-order/util"
 	"github.com/joho/godotenv"
 	"github.com/stripe/stripe-go/v80"
@@ -36,9 +37,9 @@ func main() {
 	cld := util.NewCloudinary()
 
 	ccs := handler.NewGRPCClients()
-	ccs.AddClient("USER_SERVICE", os.Getenv("USER_GRPC_PORT"))
-	ccs.AddClient("NOTIFICATION_SERVICE", os.Getenv("NOTIFICATION_GRPC_PORT"))
-	ccs.AddClient("CHAT_SERVICE", os.Getenv("CHAT_GRPC_PORT"))
+	ccs.AddClient(types.USER_SERVICE, os.Getenv("USER_GRPC_PORT"))
+	ccs.AddClient(types.NOTIFICATION_SERVICE, os.Getenv("NOTIFICATION_GRPC_PORT"))
+	ccs.AddClient(types.CHAT_SERVICE, os.Getenv("CHAT_GRPC_PORT"))
 
 	go NewHttpServer(db, cld, ccs)
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Akihira77/gojobber/services/5-gig/handler"
+	"github.com/Akihira77/gojobber/services/5-gig/types"
 	"github.com/Akihira77/gojobber/services/5-gig/util"
 	"github.com/go-faker/faker/v4"
 	"github.com/joho/godotenv"
@@ -38,7 +39,7 @@ func main() {
 
 	cld := util.NewCloudinary()
 	ccs := handler.NewGRPCClients()
-	ccs.AddClient("USER_SERVICE", os.Getenv("USER_GRPC_PORT"))
+	ccs.AddClient(types.USER_SERVICE, os.Getenv("USER_GRPC_PORT"))
 
 	NewHttpServer(db, cld, ccs)
 }

@@ -75,7 +75,7 @@ func (rh *ReviewHandler) Add(c *fiber.Ctx) error {
 		})
 	}
 
-	cc, err := rh.grpcClient.GetClient("USER_SERVICE")
+	cc, err := rh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		log.Printf("Add Review Error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "Error while validating seller")
@@ -97,7 +97,7 @@ func (rh *ReviewHandler) Add(c *fiber.Ctx) error {
 	}
 
 	go func() {
-		cc, err := rh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err := rh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			log.Printf("Add Review Error:\n%+v", err)
 			return
@@ -150,18 +150,13 @@ func (rh *ReviewHandler) Update(c *fiber.Ctx) error {
 		})
 	}
 
-	r, err := rh.reviewSvc.FindReviewByID(ctx, reviewId)
+	r, err := rh.reviewSvc.FindReviewByIDAndUserID(ctx, reviewId, userInfo.UserID)
 	if err != nil {
 		log.Printf("Update Review Error:\n%+v", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fiber.NewError(http.StatusNotFound, "Review is not found")
 		}
 		return fiber.NewError(http.StatusBadRequest, "Error while saving review")
-	}
-
-	//TODO: REFACTORE THIS FUNCTION TO RETRIEVE REVIEW BY BUYER_ID AND REVIEW_ID
-	if r.BuyerID != userInfo.UserID {
-		return fiber.NewError(http.StatusBadRequest, "You cannot modify this review")
 	}
 
 	r, err = rh.reviewSvc.Update(ctx, *data)

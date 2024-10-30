@@ -19,6 +19,7 @@ type OrderService struct {
 
 type OrderServiceImpl interface {
 	FindOrderByID(ctx context.Context, id string) (*types.Order, error)
+	FindOrderByIDAndSellerID(ctx context.Context, id string, sellerId string) (*types.Order, error)
 	FindOrderByPaymentIntentID(ctx context.Context, id string) (*types.Order, error)
 	FindOrdersByBuyerID(ctx context.Context, id string) ([]types.Order, error)
 	FindOrdersBySellerID(ctx context.Context, id string) ([]types.Order, error)
@@ -316,6 +317,20 @@ func (os *OrderService) MarkReadsMyOrderNotifications(ctx context.Context, userI
 		Update("unread = ?", false)
 
 	return result.Error
+}
+
+func (os *OrderService) FindOrderByIDAndSellerID(ctx context.Context, id string, sellerId string) (*types.Order, error) {
+	var o types.Order
+	result := os.db.
+		Debug().
+		WithContext(ctx).
+		Model(&types.Order{}).
+		Preload("DeliveredHistories").
+		Preload("OrderEvents").
+		Where("id = ? AND seller_id = ?", id, sellerId).
+		First(&o)
+
+	return &o, result.Error
 }
 
 func (os *OrderService) FindOrderByID(ctx context.Context, id string) (*types.Order, error) {

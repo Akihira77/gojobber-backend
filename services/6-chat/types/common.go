@@ -10,3 +10,13 @@ type JWTClaims struct {
 	Email    string `json:"email"`
 	Username string `json:"username"`
 }
+
+const (
+	NOTIFICATION_SERVICE = "NOTIFICATION_SERVICE"
+	AUTH_SERVICE         = "AUTH_SERVICE"
+	USER_SERVICE         = "USER_SERVICE"
+	GIG_SERVICE          = "GIG_SERVICE"
+	CHAT_SERVICE         = "CHAT_SERVICE"
+	ORDER_SERVICE        = "ORDER_SERVICE"
+	REVIEW_SERVICE       = "REVIEW_SERVICE"
+)

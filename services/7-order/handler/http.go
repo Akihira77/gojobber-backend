@@ -98,7 +98,7 @@ func (oh *OrderHttpHandler) FindMyOrdersAsSeller(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
 	}
 
-	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+	cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		log.Printf("FindMyOrdersAsSeller error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching orders")
@@ -151,7 +151,7 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 		})
 	}
 
-	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+	cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		log.Printf("CreatePaymentIntent error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while validating gig")
@@ -206,7 +206,7 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 		newCtx, canc := context.WithTimeout(context.Background(), 200*time.Millisecond)
 		defer canc()
 
-		cc, err := oh.grpcClient.GetClient("CHAT_SERVICE")
+		cc, err := oh.grpcClient.GetClient(types.CHAT_SERVICE)
 		if err != nil {
 			log.Printf("Change Offer Status Error:\n+%v", err)
 			return
@@ -309,7 +309,7 @@ func (oh *OrderHttpHandler) HandleStripeWebhook(c *fiber.Ctx) error {
 			}
 
 			sellerEmail := pi.Metadata["seller_email"]
-			cc, err := oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+			cc, err := oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 			if err != nil {
 				log.Printf("HandleStripeWebhook Error:\n+%v", err)
 				return
@@ -359,7 +359,7 @@ func (oh *OrderHttpHandler) BuyerMarkOrderAsComplete(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while finding order")
 	}
 
-	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+	cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		log.Printf("OrderComplete error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
@@ -378,7 +378,7 @@ func (oh *OrderHttpHandler) BuyerMarkOrderAsComplete(c *fiber.Ctx) error {
 	//HACK: IF THERE ARE ERRORS FOR SENDING EMAIL NOTIFICATION
 	// THEN IT SHOULDN'T AFFECT CODE FLOW
 	go func() {
-		cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err = oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			log.Printf("OrderComplete error:\n+%v", err)
 			return
@@ -409,7 +409,6 @@ func (oh *OrderHttpHandler) BuyerMarkOrderAsComplete(c *fiber.Ctx) error {
 	})
 }
 
-// TODO: REFACTORE TO RETRIEVE ORDER BY SELLER_ID AND ORDER_ID
 func (oh *OrderHttpHandler) SellerCancellingOrder(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 2*time.Second)
 	defer cancel()
@@ -438,21 +437,7 @@ func (oh *OrderHttpHandler) SellerCancellingOrder(c *fiber.Ctx) error {
 		})
 	}
 
-	o, err := oh.orderSvc.FindOrderByID(ctx, c.Params("orderId"))
-	if err != nil {
-		log.Printf("SellerCancellingOrder error:\n+%v", err)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fiber.NewError(http.StatusNotFound, "Order is not found")
-		}
-		return fiber.NewError(http.StatusInternalServerError, "Error while finding order")
-	}
-
-	if o.Status != types.PROCESS {
-		log.Println("Order is not in PROCESS status, seller cannot cancel this order", o)
-		return fiber.NewError(http.StatusBadRequest, "Seller cannot cancel this order because Order Status is not in PROCESS stage")
-	}
-
-	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+	cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		log.Printf("SellerCancellingOrder error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while finding order")
@@ -468,9 +453,18 @@ func (oh *OrderHttpHandler) SellerCancellingOrder(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching seller data")
 	}
 
-	if o.SellerID != s.Id {
+	o, err := oh.orderSvc.FindOrderByIDAndSellerID(ctx, c.Params("orderId"), s.Id)
+	if err != nil {
 		log.Printf("SellerCancellingOrder error:\n+%v", err)
-		return fiber.NewError(http.StatusForbidden, "You dont have the right permission to access this resource")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fiber.NewError(http.StatusNotFound, "Order is not found")
+		}
+		return fiber.NewError(http.StatusInternalServerError, "Error while finding order")
+	}
+
+	if o.Status != types.PROCESS {
+		log.Println("Order is not in PROCESS status, seller cannot cancel this order", o)
+		return fiber.NewError(http.StatusBadRequest, "Seller cannot cancel this order because Order Status is not in PROCESS stage")
 	}
 
 	refundRes, err := refund.New(&stripe.RefundParams{
@@ -503,7 +497,7 @@ func (oh *OrderHttpHandler) SellerCancellingOrder(c *fiber.Ctx) error {
 			return
 		}
 
-		cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err = oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			log.Printf("SellerCancellingOrder error:\n+%v", err)
 			return
@@ -569,7 +563,7 @@ func (oh *OrderHttpHandler) RequestDeadlineExtension(c *fiber.Ctx) error {
 		newCtx, canc := context.WithTimeout(context.Background(), 200*time.Millisecond)
 		defer canc()
 
-		cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+		cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 		if err != nil {
 			log.Printf("RequestExtendingDeadline error:\n+%v", err)
 			return
@@ -584,7 +578,7 @@ func (oh *OrderHttpHandler) RequestDeadlineExtension(c *fiber.Ctx) error {
 			return
 		}
 
-		cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err = oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			log.Printf("RequestExtendingDeadline error:\n+%v", err)
 			return
@@ -643,7 +637,7 @@ func (oh *OrderHttpHandler) BuyerDeadlineExtensionResponse(c *fiber.Ctx) error {
 		newCtx, canc := context.WithTimeout(context.Background(), 200*time.Millisecond)
 		defer canc()
 
-		cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+		cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 		if err != nil {
 			log.Printf("BuyerDeadlineExtensionResponse error:\n+%v", err)
 			return
@@ -658,7 +652,7 @@ func (oh *OrderHttpHandler) BuyerDeadlineExtensionResponse(c *fiber.Ctx) error {
 			return
 		}
 
-		cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err = oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			log.Printf("BuyerDeadlineExtensionResponse error:\n+%v", err)
 			return
@@ -736,7 +730,7 @@ func (oh *OrderHttpHandler) BuyerRefundingOrder(c *fiber.Ctx) error {
 			newCtx, canc := context.WithTimeout(context.Background(), 200*time.Millisecond)
 			defer canc()
 
-			cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+			cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 			if err != nil {
 				log.Printf("BuyerRefundingOrder error:\n+%v", err)
 			}
@@ -750,7 +744,7 @@ func (oh *OrderHttpHandler) BuyerRefundingOrder(c *fiber.Ctx) error {
 				return
 			}
 
-			cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+			cc, err = oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 			if err != nil {
 				log.Printf("BuyerRefundingOrder error:\n+%v", err)
 				return
@@ -817,7 +811,7 @@ func (oh *OrderHttpHandler) SellerDeliverOrder(c *fiber.Ctx) error {
 		newCtx, canc := context.WithTimeout(context.Background(), 200*time.Millisecond)
 		defer canc()
 
-		cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+		cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 		if err != nil {
 			log.Printf("SellerDeliveringOrder error:\n+%v", err)
 		}
@@ -831,7 +825,7 @@ func (oh *OrderHttpHandler) SellerDeliverOrder(c *fiber.Ctx) error {
 			return
 		}
 
-		cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err = oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			log.Printf("SellerDeliveringOrder error:\n+%v", err)
 			return
@@ -875,7 +869,7 @@ func (oh *OrderHttpHandler) SellerAcknowledgeOrder(c *fiber.Ctx) error {
 		newCtx, canc := context.WithTimeout(context.Background(), 200*time.Millisecond)
 		defer canc()
 
-		cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+		cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 		if err != nil {
 			log.Printf("SellerAcknowledgeOrder error:\n+%v", err)
 		}
@@ -889,7 +883,7 @@ func (oh *OrderHttpHandler) SellerAcknowledgeOrder(c *fiber.Ctx) error {
 			return
 		}
 
-		cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err = oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			log.Printf("SellerAcknowledgeOrder error:\n+%v", err)
 			return
@@ -946,7 +940,7 @@ func (oh *OrderHttpHandler) BuyerResponseForDeliveredOrder(c *fiber.Ctx) error {
 		newCtx, canc := context.WithTimeout(context.Background(), 200*time.Millisecond)
 		defer canc()
 
-		cc, err := oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err := oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			log.Printf("BuyerResponseForDeliveredOrder Error:\n+%v", err)
 			return
@@ -961,7 +955,7 @@ func (oh *OrderHttpHandler) BuyerResponseForDeliveredOrder(c *fiber.Ctx) error {
 			return
 		}
 
-		cc, err = oh.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err = oh.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			log.Printf("BuyerResponseForDeliveredOrder Error:\n+%v", err)
 			return
@@ -1013,7 +1007,7 @@ func (oh *OrderHttpHandler) StripeTOSAcceptance(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
 	}
 
-	cc, err := oh.grpcClient.GetClient("USER_SERVICE")
+	cc, err := oh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		log.Printf("StripeTOSAcceptance error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")

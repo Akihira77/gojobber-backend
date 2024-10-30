@@ -55,7 +55,7 @@ func (ch *ChatHandler) GetAllMyConversations(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching conversations data")
 	}
 
-	cc, err := ch.grpcClient.GetClient("USER_SERVICE")
+	cc, err := ch.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		fmt.Printf("Get All My Conversations Error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching conversations data")
@@ -148,7 +148,7 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "Error reading request body")
 	}
 
-	cc, err := ch.grpcClient.GetClient("USER_SERVICE")
+	cc, err := ch.grpcClient.GetClient(types.USER_SERVICE)
 	userGrpcClient := user.NewUserServiceClient(cc)
 	if err != nil {
 		fmt.Printf("InsertMessage Error:\n%+v", err)
@@ -216,7 +216,7 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 			return
 		}
 
-		cc, err = ch.grpcClient.GetClient("NOTIFICATION_SERVICE")
+		cc, err = ch.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 		if err != nil {
 			fmt.Printf("InsertMessage Error:\n+%v", err)
 			return

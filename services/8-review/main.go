@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Akihira77/gojobber/services/8-review/handler"
+	"github.com/Akihira77/gojobber/services/8-review/types"
 	"github.com/joho/godotenv"
 )
 
@@ -36,8 +37,8 @@ func main() {
 	// }
 
 	ccs := handler.NewGRPCClients()
-	ccs.AddClient("USER_SERVICE", os.Getenv("USER_GRPC_PORT"))
-	ccs.AddClient("NOTIFICATION_SERVICE", os.Getenv("NOTIFICATION_GRPC_PORT"))
+	ccs.AddClient(types.USER_SERVICE, os.Getenv("USER_GRPC_PORT"))
+	ccs.AddClient(types.NOTIFICATION_SERVICE, os.Getenv("NOTIFICATION_GRPC_PORT"))
 
 	NewHttpServer(db, ccs)
 }

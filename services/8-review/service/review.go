@@ -17,6 +17,7 @@ type ReviewService struct {
 type ReviewServiceImpl interface {
 	FindSellerReviews(ctx context.Context, sellerID string) ([]types.Review, error)
 	FindReviewByID(ctx context.Context, id uuid.UUID) (*types.Review, error)
+	FindReviewByIDAndUserID(ctx context.Context, id uuid.UUID, userId string) (*types.Review, error)
 	Add(ctx context.Context, data types.UpsertReviewDTO) (*types.Review, error)
 	Update(ctx context.Context, data types.Review) (*types.Review, error)
 	Remove(ctx context.Context, reviewID string) error
@@ -39,6 +40,19 @@ func (rs *ReviewService) FindSellerReviews(ctx context.Context, sellerID string)
 		Find(&rvs)
 
 	return rvs, result.Error
+}
+
+func (rs *ReviewService) FindReviewByIDAndUserID(ctx context.Context, id uuid.UUID, userId string) (*types.Review, error) {
+	var r types.Review
+
+	result := rs.db.
+		Debug().
+		WithContext(ctx).
+		Model(&types.Review{}).
+		Where("id = ? AND buyer_id = ?", id, userId).
+		First(&r)
+
+	return &r, result.Error
 }
 
 func (rs *ReviewService) FindReviewByID(ctx context.Context, id uuid.UUID) (*types.Review, error) {
