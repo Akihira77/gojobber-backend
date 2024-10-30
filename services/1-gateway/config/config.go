@@ -10,6 +10,15 @@ import (
 
 var GoogleOAuthConfig map[string]*oauth2.Config
 
+func GetGoogleOAuthConfig(name string) (*oauth2.Config, error) {
+	cfg, ok := GoogleOAuthConfig[name]
+	if !ok {
+		return nil, fmt.Errorf("OAuth Config For [%s] Action Did Not Exists", name)
+	}
+
+	return cfg, nil
+}
+
 func NewGoogleAuthConfig(port string) {
 	GoogleOAuthConfig = make(map[string]*oauth2.Config)
 

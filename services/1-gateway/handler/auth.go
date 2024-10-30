@@ -83,8 +83,15 @@ func (ah *AuthHandler) AuthWithGoogle(c *fiber.Ctx) error {
 }
 
 func (ah *AuthHandler) SignInWithGoogle(c *fiber.Ctx) error {
-	googleCfg := config.GoogleOAuthConfig["signin"]
-	userData, err := ah.googleCallback(c.Query("code"), *googleCfg)
+	cfg, err := config.GetGoogleOAuthConfig("signin")
+	if err != nil {
+		log.Printf("Google Signup Error:\n%+v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"err": err,
+		})
+	}
+
+	userData, err := ah.googleCallback(c.Query("code"), *cfg)
 	if err != nil {
 		log.Printf("Google Signin Error:\n%+v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -154,8 +161,15 @@ func (ah *AuthHandler) SignIn(c *fiber.Ctx) error {
 }
 
 func (ah *AuthHandler) SignUpWithGoogle(c *fiber.Ctx) error {
-	googleCfg := config.GoogleOAuthConfig["signup"]
-	userData, err := ah.googleCallback(c.Query("code"), *googleCfg)
+	cfg, err := config.GetGoogleOAuthConfig("signup")
+	if err != nil {
+		log.Printf("Google Signup Error:\n%+v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"err": err,
+		})
+	}
+
+	userData, err := ah.googleCallback(c.Query("code"), *cfg)
 	if err != nil {
 		log.Printf("Google Signup Error:\n%+v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
