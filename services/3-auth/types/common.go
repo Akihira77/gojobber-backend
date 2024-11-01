@@ -6,9 +6,10 @@ import (
 
 type JWTClaims struct {
 	jwt.RegisteredClaims
-	UserID   string `json:"userId"`
-	Email    string `json:"email"`
-	Username string `json:"username"`
+	UserID       string `json:"userId"`
+	Email        string `json:"email"`
+	Username     string `json:"username"`
+	VerifiedUser bool   `json:"verifiedUser"`
 }
 
 type ErrorResult struct {

@@ -123,6 +123,10 @@ func (sh *SellerHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please re-signin")
 	}
 
+	if !userInfo.VerifiedUser {
+		return fiber.NewError(http.StatusForbidden, "Verify Your Email First")
+	}
+
 	data := new(types.CreateSellerDTO)
 	if err := c.BodyParser(data); err != nil {
 		fmt.Printf("%+v", err)
@@ -192,6 +196,10 @@ func (sh *SellerHandler) Update(c *fiber.Ctx) error {
 	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
 	if !ok {
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please re-signin")
+	}
+
+	if !userInfo.VerifiedUser {
+		return fiber.NewError(http.StatusForbidden, "Verify Your Email First")
 	}
 
 	data := new(types.UpdateSellerDTO)

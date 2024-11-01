@@ -116,7 +116,11 @@ func (ah *AuthHandler) SignInWithGoogle(c *fiber.Ctx) error {
 }
 
 func (ah *AuthHandler) SignIn(c *fiber.Ctx) error {
-	via := c.UserContext().Value("via").(string)
+	via, ok := c.UserContext().Value("via").(string)
+	if !ok {
+		via = ""
+	}
+
 	var route string
 	switch via {
 	case "google":

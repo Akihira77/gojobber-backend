@@ -33,7 +33,7 @@ func (h *UserGRPCHandler) SaveBuyerData(ctx context.Context, req *user.SaveBuyer
 		Message: "",
 	}
 
-	b := &types.Buyer{
+	b := types.Buyer{
 		ID:             req.Id,
 		Username:       req.Username,
 		Email:          req.Email,
@@ -43,7 +43,7 @@ func (h *UserGRPCHandler) SaveBuyerData(ctx context.Context, req *user.SaveBuyer
 		CreatedAt:      req.CreatedAt.AsTime(),
 	}
 
-	err := h.buyerSvc.Create(ctx, *b)
+	err := h.buyerSvc.Create(ctx, b)
 	if err != nil {
 		res.Message = err.Error()
 		log.Println("Error", err)

@@ -19,7 +19,7 @@ var (
 
 func generateGatewayToken(c *fiber.Ctx) error {
 	gatewaySecret := os.Getenv("GATEWAY_TOKEN")
-	gatewayToken, err := util.SigningJWT(gatewaySecret)
+	gatewayToken, err := util.GenerateJWT(gatewaySecret)
 	if err != nil {
 		fmt.Printf("generating gateway token error:\n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened.")
@@ -111,13 +111,14 @@ func userRouter(base_url string, r fiber.Router) {
 	r.Use(authOnly)
 	r.Get("/buyers/my-info", uh.GetMyBuyerInfo)
 	r.Get("/buyers/:username", uh.FindBuyerByUsername)
+	r.Put("/buyers", uh.UpdateBuyer)
 
 	r.Get("/sellers/my-info", uh.GetMySellerInfo)
 	r.Get("/sellers/id/:id", uh.FindSellerByID)
 	r.Get("/sellers/username/:username", uh.FindSellerByUsername)
 	r.Get("/sellers/random/:count", uh.GetRandomSellers)
 	r.Post("/sellers", uh.Create)
-	r.Put("/sellers", uh.Update)
+	r.Put("/sellers", uh.UpdateSeller)
 
 }
 

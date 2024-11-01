@@ -15,8 +15,8 @@ func main() {
 
 	db, _ := NewStore()
 
-	// db.Debug().Exec(`CREATE EXTENSION IF NOT EXISTS tsm_system_rows;`)
-	// db.Debug().Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
+	db.Debug().Exec(`CREATE EXTENSION IF NOT EXISTS tsm_system_rows;`)
+	db.Debug().Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
 	// err = db.
 	// 	Debug().
 	// 	Migrator().

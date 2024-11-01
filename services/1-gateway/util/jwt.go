@@ -13,7 +13,7 @@ var ServiceID = "API Gateway"
 var JWT_EXPIRATION = 1 * time.Hour
 var JWT_SIGNING_METHOD = jwt.SigningMethodHS256
 
-func SigningJWT(secret string) (string, error) {
+func GenerateJWT(secret string) (string, error) {
 	claims := jwt.MapClaims{
 		"iss": ServiceID,
 	}

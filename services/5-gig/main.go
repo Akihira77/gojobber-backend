@@ -24,7 +24,7 @@ func main() {
 	}
 
 	db, _ := NewStore()
-	// db.Debug().Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
+	db.Debug().Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
 	// db.Migrator().DropTable(
 	// 	&types.Gig{},
 	// )
@@ -33,9 +33,9 @@ func main() {
 	// )
 	// err = types.ApplyDBSetup(db)
 	// seedingGig(db)
-	// if err != nil {
-	// 	log.Fatalf("Error applying DB setup:\n%+v", err)
-	// }
+	if err != nil {
+		log.Fatalf("Error applying DB setup:\n%+v", err)
+	}
 
 	cld := util.NewCloudinary()
 	ccs := handler.NewGRPCClients()

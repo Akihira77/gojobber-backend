@@ -137,6 +137,10 @@ func (oh *OrderHttpHandler) CreatePaymentIntent(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
 	}
 
+	if !userInfo.VerifiedUser {
+		return fiber.NewError(http.StatusForbidden, "Verify Your Email First")
+	}
+
 	data := new(types.CreateOrderDTO)
 	err := c.BodyParser(data)
 	if err != nil {

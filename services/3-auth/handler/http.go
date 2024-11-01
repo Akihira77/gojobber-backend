@@ -82,7 +82,7 @@ func (ah *AuthHttpHandler) SignIn(c *fiber.Ctx) error {
 		}
 	}
 
-	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), u.ID, u.Email, u.Username)
+	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), u.ID, u.Email, u.Username, u.EmailVerified)
 	if err != nil {
 		fmt.Printf("signin error: \n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "signin failed")
@@ -210,7 +210,7 @@ func (ah *AuthHttpHandler) SignUp(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while saving your data")
 	}
 
-	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), result.ID, result.Email, result.Username)
+	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), result.ID, result.Email, result.Username, result.EmailVerified)
 	if err != nil {
 		fmt.Printf("signup error: \n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while generating response")
@@ -236,7 +236,7 @@ func (ah *AuthHttpHandler) RefreshToken(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 
-	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), userInfo.UserID, userInfo.Email, userInfo.Username)
+	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), userInfo.UserID, userInfo.Email, userInfo.Username, userInfo.VerifiedUser)
 	if err != nil {
 		log.Printf("refreshtoken:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "failed refresh the token")

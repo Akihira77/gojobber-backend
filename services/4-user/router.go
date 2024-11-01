@@ -35,6 +35,7 @@ func MainRouter(db *gorm.DB, app *fiber.App) {
 
 	api.Get("/buyers/my-info", bh.GetMyBuyerInfo)
 	api.Get("/buyers/:username", bh.FindBuyerByUsername)
+	api.Put("/buyers", bh.Update)
 
 	ss := service.NewSellerService(db)
 	sh := handler.NewSellerHandler(bs, ss)

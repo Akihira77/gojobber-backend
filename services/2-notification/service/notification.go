@@ -259,9 +259,8 @@ func (ns *NotificationService) SellerHasCompletedAnOrder(data *notification.Sell
 		errCh <- helper.SendMail(
 			data.ReceiverEmail,
 			fmt.Sprintf("Buyer [%s] Mark Your Order [%s] As COMPLETED", data.BuyerEmail, data.OrderId),
-			fmt.Sprintf("Your Current Balance is: %s.\nCheck Your Order %s", data.SellerCurrentBalance, data.Url),
+			fmt.Sprintf("Your Current Balance is: %s. \nCheck Your Order %s", data.SellerCurrentBalance, data.Url),
 		)
-
 	}()
 
 	wg.Wait()

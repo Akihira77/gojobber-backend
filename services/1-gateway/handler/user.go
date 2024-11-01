@@ -122,11 +122,24 @@ func (uh *UserHandler) Create(c *fiber.Ctx) error {
 	return c.Status(statusCode).Send(body)
 }
 
-func (uh *UserHandler) Update(c *fiber.Ctx) error {
+func (uh *UserHandler) UpdateSeller(c *fiber.Ctx) error {
 	route := uh.base_url + fmt.Sprintf("/api/v1/users/sellers")
 	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
 	if len(errs) > 0 {
 		fmt.Println("USER - updating seller error", errs)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"errs": errs,
+		})
+	}
+
+	return c.Status(statusCode).Send(body)
+}
+
+func (uh *UserHandler) UpdateBuyer(c *fiber.Ctx) error {
+	route := uh.base_url + fmt.Sprintf("/api/v1/users/buyers")
+	statusCode, body, errs := sendHttpReqToAnotherService(c, route)
+	if len(errs) > 0 {
+		fmt.Println("USER - updating buyer error", errs)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"errs": errs,
 		})

@@ -15,6 +15,7 @@ type BuyerServiceImpl interface {
 	FindBuyerByID(ctx context.Context, id string) (*types.Buyer, error)
 	FindBuyerByEmailOrUsername(ctx context.Context, str string) (*types.Buyer, error)
 	Create(ctx context.Context, b types.Buyer) error
+	Update(ctx context.Context, b types.Buyer, data *types.EditBuyerDTO) (*types.Buyer, error)
 	Delete(ctx context.Context, userId string) error
 }
 
@@ -48,6 +49,17 @@ func (bs *BuyerService) Create(ctx context.Context, b types.Buyer) error {
 		WithContext(ctx).
 		Model(&types.Buyer{}).
 		Create(&b).Error
+}
+
+func (bs *BuyerService) Update(ctx context.Context, b types.Buyer, data *types.EditBuyerDTO) (*types.Buyer, error) {
+	b.Country = data.Country
+	b.ProfilePicture = data.ProfilePicture
+
+	result := bs.db.
+		WithContext(ctx).
+		Save(&b)
+
+	return &b, result.Error
 }
 
 func (bs *BuyerService) Delete(ctx context.Context, userId string) error {
