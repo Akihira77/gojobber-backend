@@ -1,12 +1,60 @@
 package types
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
+
+type OfferStatus string
+
+const (
+	PENDING  OfferStatus = "PENDING"
+	CANCELED OfferStatus = "CANCELED"
+	ACCEPTED OfferStatus = "ACCEPTED"
+)
+
+func (p *OfferStatus) Scan(value interface{}) error {
+	*p = OfferStatus(value.([]byte))
+	return nil
+}
+
+func (p OfferStatus) Value() (driver.Value, error) {
+	return string(p), nil
+}
+
+type Offer struct {
+	GigTitle             string      `json:"gigTitle" form:"gigTitle" validate:"required"`
+	Price                uint        `json:"price" form:"price" validate:"required,gt=0"`
+	ExpectedDeliveryDays uint        `json:"expectedDeliveryDays" form:"expectedDeliveryDays" validate:"required,gt=0,lte=365"`
+	Description          string      `json:"description" form:"description"`
+	Status               OfferStatus `json:"status" gorm:"not null;"`
+	CreatedAt            time.Time   `json:"createdAt" gorm:"not null;"`
+}
+
+func (o *Offer) Scan(value interface{}) error {
+	if value == nil {
+		*o = Offer{}
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return fmt.Errorf("could not scan type %T into Offer", value)
+	}
+	return json.Unmarshal(bytes, &o)
+}
+
+func (o *Offer) Value() (driver.Value, error) {
+	if o == nil {
+		return nil, nil
+	}
+	return json.Marshal(o)
+}
 
 type Message struct {
 	ID             uuid.UUID `json:"id" gorm:"primaryKey;type:uuid;default:uuid_generate_v4();"`
@@ -19,15 +67,6 @@ type Message struct {
 	SenderID       string    `json:"senderId"`
 }
 
-type Offer struct {
-	GigTitle             string `json:"gigTitle" form:"gigTitle" validate:"required"`
-	Price                uint   `json:"price" form:"price" validate:"required"`
-	ExpectedDeliveryDays uint   `json:"expectedDeliveryDays" form:"expectedDeliveryDays"`
-	Description          string `json:"description" form:"description"`
-	Accepted             bool   `json:"accepted" gorm:"not null;default:false"`
-	Cancelled            bool   `json:"cancelled" gorm:"not null;default:false"`
-}
-
 type MessageDTO struct {
 	ID        uuid.UUID `json:"id"`
 	Body      string    `json:"body,omitempty"`
@@ -38,24 +77,13 @@ type MessageDTO struct {
 	SenderID  string    `json:"senderId"`
 }
 
-type UserMessage struct {
-	UserOneID             string    `json:"userOneId"`
-	UserOneName           string    `json:"userOneName"`
-	UserOneProfilePicture string    `json:"userOneProfilePicture"`
-	UserTwoID             string    `json:"userTwoId"`
-	UserTwoName           string    `json:"userTwoName"`
-	UserTwoProfilePicture string    `json:"userTwoProfilePicture"`
-	Messages              []Message `json:"messages"`
-}
-
 type CreateMessageDTO struct {
-	// SenderID      string         `json:"senderId"`
 	ReceiverID    string         `json:"receiverId" form:"receiverId" validate:"required"`
-	ReceiverEmail string         `json:"receiverEmail" form:"receiverEmail" validate:"required,email"`
+	ReceiverEmail string         `json:"receiverEmail" validate:"required,email"`
 	Body          string         `json:"body" form:"body"`
 	File          multipart.File `json:"file" form:"file"`
 	FileURL       string         `json:"fileUrl"`
-	Offer         *Offer         `json:"offer" form:"offer"`
+	Offer         *Offer         `json:"offer,omitempty" form:"offer"`
 }
 
 type Conversation struct {

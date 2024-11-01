@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Akihira77/gojobber/services/6-chat/handler"
+	"github.com/Akihira77/gojobber/services/6-chat/types"
 	"github.com/Akihira77/gojobber/services/6-chat/util"
 	"github.com/joho/godotenv"
 )
@@ -32,8 +33,15 @@ func main() {
 
 	cld := util.NewCloudinary()
 	ccs := handler.NewGRPCClients()
-	ccs.AddClient("AUTH_SERVICE", os.Getenv("AUTH_GRPC_PORT"))
-	ccs.AddClient("NOTIFICATION_SERVICE", os.Getenv("NOTIFICATION_GRPC_PORT"))
+	ccs.AddClient(types.AUTH_SERVICE, os.Getenv("AUTH_GRPC_PORT"))
+	ccs.AddClient(types.USER_SERVICE, os.Getenv("USER_GRPC_PORT"))
+	ccs.AddClient(types.NOTIFICATION_SERVICE, os.Getenv("NOTIFICATION_GRPC_PORT"))
 
-	NewHttpServer(db, cld, ccs)
+	go NewHttpServer(db, cld, ccs)
+
+	grpcServer := NewGRPCServer(os.Getenv("CHAT_GRPC_PORT"))
+	err = grpcServer.Run(db)
+	if err != nil {
+		log.Fatalf("Error running grpc server:\n+%v", err)
+	}
 }

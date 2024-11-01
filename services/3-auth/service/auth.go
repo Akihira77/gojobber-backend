@@ -39,7 +39,8 @@ func (as *AuthService) FindUserByUsernameOrEmail(ctx context.Context, str string
 	var user types.AuthExcludePassword
 	result := as.db.WithContext(ctx).
 		Model(&types.Auth{}).
-		First(&user, "username = ? OR email = ?", str, str)
+		Where("username = ? OR email = ?", str, str).
+		First(&user)
 	return &user, result.Error
 }
 
@@ -47,7 +48,8 @@ func (as *AuthService) FindUserByUsernameOrEmailIncPassword(ctx context.Context,
 	var user types.Auth
 	result := as.db.WithContext(ctx).
 		Model(&types.Auth{}).
-		First(&user, "username = ? OR email = ?", str, str)
+		Where("username = ? OR email = ?", str, str).
+		First(&user)
 	return &user, result.Error
 }
 
@@ -92,13 +94,23 @@ func (as *AuthService) Create(ctx context.Context, u *types.SignUp, userGrpcClie
 		return &types.AuthExcludePassword{}, err
 	}
 
+	var result types.AuthExcludePassword
+	err = tx.
+		Model(&types.Auth{}).
+		Where("id = ?", auth.ID).
+		First(&result).Error
+	if err != nil {
+		tx.Rollback()
+		return &types.AuthExcludePassword{}, err
+	}
+
 	return &types.AuthExcludePassword{
-		ID:              auth.ID,
-		Username:        auth.Username,
-		Email:           auth.Email,
-		Country:         auth.Country,
-		ProfilePicture:  auth.ProfilePicture,
-		ProfilePublicID: auth.ProfilePublicID,
+		ID:              result.ID,
+		Username:        result.Username,
+		Email:           result.Email,
+		Country:         result.Country,
+		ProfilePicture:  result.ProfilePicture,
+		ProfilePublicID: result.ProfilePublicID,
 	}, tx.Commit().Error
 }
 
@@ -106,7 +118,9 @@ func (as *AuthService) FindUserByID(ctx context.Context, id string) (*types.Auth
 	var user types.AuthExcludePassword
 	result := as.db.WithContext(ctx).
 		Model(&types.Auth{}).
-		First(&user, "id = ?", id)
+		Where("id = ?", id).
+		First(&user)
+
 	return &user, result.Error
 }
 
@@ -114,7 +128,9 @@ func (as *AuthService) FindUserByIDIncPassword(ctx context.Context, id string) (
 	var user types.Auth
 	result := as.db.WithContext(ctx).
 		Model(&types.Auth{}).
-		First(&user, "id = ?", id)
+		Where("id = ?", id).
+		First(&user)
+
 	return &user, result.Error
 }
 
@@ -122,7 +138,8 @@ func (as *AuthService) FindUserByVerificationToken(ctx context.Context, token st
 	var user types.AuthExcludePassword
 	result := as.db.WithContext(ctx).
 		Model(&types.Auth{}).
-		First(&user, "emailVerificationToken = ?", token)
+		Where("email_verification_token = ?", token).
+		First(&user)
 	return &user, result.Error
 }
 
@@ -130,36 +147,45 @@ func (as *AuthService) FindUserByPasswordToken(ctx context.Context, token string
 	var user types.AuthExcludePassword
 	result := as.db.WithContext(ctx).
 		Model(&types.Auth{}).
-		First(&user,
-			"passwordResetToken = ? OR passwordResetExpires > ?", token, time.Now().String())
+		Where("password_reset_token = ?", token).
+		First(&user)
+
 	return &user, result.Error
 }
 
-func (as *AuthService) UpdateEmailVerification(ctx context.Context,
-	userId string, emailStatus bool, emailVerifToken ...string) (*types.AuthExcludePassword, error) {
-	var user types.AuthExcludePassword
+func (as *AuthService) UpdateEmailVerification(ctx context.Context, userId string, emailStatus bool, emailVerifToken ...string) (*types.AuthExcludePassword, error) {
+	tx := as.db.
+		Debug().
+		WithContext(ctx).
+		Begin()
+
 	var result *gorm.DB
-	if len(emailVerifToken) == 0 {
-		result = as.db.WithContext(ctx).
-			Model(&types.Auth{}).
-			Where("id = ?", userId).
-			Updates(types.Auth{EmailVerificationToken: util.NewNullString(""), EmailVerified: emailStatus})
-	} else if len(emailVerifToken) == 1 {
-		result = as.db.WithContext(ctx).
+
+	if len(emailVerifToken) > 1 {
+		err := fmt.Errorf("BUG!. email verification token is too many")
+		return nil, err
+	} else {
+		result = tx.
 			Model(&types.Auth{}).
 			Where("id = ?", userId).
 			Updates(types.Auth{EmailVerificationToken: util.NewNullString(emailVerifToken[0]), EmailVerified: emailStatus})
-	} else {
-		err := fmt.Errorf("BUG!. email verification token is too many")
-		return nil, err
+		if result.Error != nil {
+			tx.Rollback()
+			return nil, result.Error
+		}
 	}
 
+	var user types.AuthExcludePassword
+
+	result = tx.
+		Model(&types.Auth{}).
+		First(&user, "id = ?", userId)
 	if result.Error != nil {
+		tx.Rollback()
 		return nil, result.Error
 	}
 
-	result = result.Model(&types.Auth{}).
-		First(&user, "id = ?", userId)
+	result = tx.Commit()
 
 	return &user, result.Error
 }

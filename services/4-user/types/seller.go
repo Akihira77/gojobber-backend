@@ -53,7 +53,7 @@ type EducationDTO struct {
 	Title      string `json:"title" validate:"required"`
 	Major      string `json:"major" validate:"required"`
 	University string `json:"university" validate:"required"`
-	Country    string `json:"country" validate:"required"`
+	Country    string `json:"country" validate:"required,alpha"`
 }
 
 type Experience struct {
@@ -78,47 +78,51 @@ type ExperienceDTO struct {
 }
 
 type CreateSellerDTO struct {
-	FullName     string           `json:"fullName" validate:"required"`
-	Bio          string           `json:"bio" validate:"required"`
-	Languages    []Language       `json:"languages" validate:"required"`
-	Skills       []Skill          `json:"skills" validate:"required,min=1"`
-	Certificates []CertificateDTO `json:"certificates" validate:"required,min=1"`
-	Educations   []EducationDTO   `json:"educations" validate:"required,min=1"`
-	Experiences  []ExperienceDTO  `json:"experiences" validate:"required,min=1"`
+	FullName        string           `json:"fullName" validate:"required"`
+	Bio             string           `json:"bio" validate:"required"`
+	Languages       []Language       `json:"languages" validate:"required,min=1"`
+	Skills          []Skill          `json:"skills" validate:"required,min=1"`
+	Certificates    []CertificateDTO `json:"certificates" validate:"required,min=1"`
+	Educations      []EducationDTO   `json:"educations" validate:"required,min=1"`
+	Experiences     []ExperienceDTO  `json:"experiences" validate:"required,min=1"`
+	StripeAccountID string           `json:"stripeAccountId"`
 }
 
 type Seller struct {
-	ID      string `json:"id" gorm:"primaryKey;"`
-	BuyerID string `json:"buyerId" gorm:"unique;not null;"`
-	// Buyer            Buyer          `json:"buyer,omitempty" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	ID               string         `json:"id" gorm:"primaryKey;"`
+	BuyerID          string         `json:"buyerId" gorm:"unique;not null;"`
+	StripeAccountID  string         `json:"stripeAccountId" gorm:"unique;not null;"`
 	FullName         string         `json:"fullName" gorm:"not null;"`
 	Bio              string         `json:"bio" gorm:"not null;"`
 	RatingsCount     uint64         `json:"ratingsCount" gorm:"not null;"`
 	RatingSum        uint64         `json:"ratingSum" gorm:"not null;"`
 	RatingCategories RatingCategory `json:"ratingCategories" gorm:"type:jsonb;not null;serializer:json;"`
-}
-
-type TestSeller struct {
-	ID               string           `json:"id" gorm:"primaryKey;"`
-	BuyerID          string           `json:"buyerId"`
-	Buyer            Buyer            `json:"buyer,omitempty" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	FullName         string           `json:"fullName" gorm:"not null;"`
-	Bio              string           `json:"bio" gorm:"not null;"`
-	RatingsCount     uint64           `json:"ratingsCount" gorm:"not null;"`
-	RatingSum        uint64           `json:"ratingSum" gorm:"not null;"`
-	RatingCategories RatingCategory   `json:"ratingCategories" gorm:"type:jsonb;not null;serializer:json;"`
-	Languages        []SellerLanguage `json:"languages" gorm:"foreignKey:SellerID;references:ID"`
-	Skills           []SellerSkill    `json:"skills" gorm:"foreignKey:SellerID;references:ID"`
-	Certificates     []Certificate    `json:"certificates" gorm:"foreignKey:SellerID;references:ID"`
-	Educations       []Education      `json:"educations" gorm:"foreignKey:SellerID;references:ID"`
-	Experiences      []Experience     `json:"experiences" gorm:"foreignKey:SellerID;references:ID"`
+	AccountBalance   uint64         `json:"accountBalance" gorm:"not null; default:0;"`
 }
 
 type SellerOverview struct {
-	FullName         string         `json:"fullName" gorm:"column:full_name"`
-	RatingsCount     uint64         `json:"ratingsCount" gorm:"column:ratings_count"`
-	RatingSum        uint64         `json:"ratingSum" gorm:"column:rating_sum"`
-	RatingCategories RatingCategory `json:"ratingCategories" gorm:"serializer:json;column:rating_categories;"`
+	ID               string         `json:"id"`
+	FullName         string         `json:"fullName"`
+	Email            string         `json:"email"`
+	RatingsCount     uint64         `json:"ratingsCount"`
+	RatingSum        uint64         `json:"ratingSum"`
+	RatingCategories RatingCategory `json:"ratingCategories"`
+	StripeAccountID  string         `json:"stringAccountId"`
+}
+
+type SellerIncBalanceDTO struct {
+	ID               string         `json:"id"`
+	FullName         string         `json:"fullName"`
+	Username         string         `json:"username,omitempty"`
+	Email            string         `json:"email"`
+	Country          string         `json:"country"`
+	Bio              string         `json:"bio"`
+	ProfilePicture   string         `json:"profilePicture"`
+	RatingsCount     uint64         `json:"ratingsCount"`
+	RatingSum        uint64         `json:"ratingSum"`
+	RatingCategories RatingCategory `json:"ratingCategories" gorm:"serializer:json"`
+	StripeAccountID  string         `json:"stripeAccountId" gorm:"unique;not null;"`
+	AccountBalance   uint64         `json:"accountBalance" gorm:"not null; default:0;"`
 }
 
 type SellerDTO struct {
@@ -142,11 +146,11 @@ type SellerDTO struct {
 type UpdateSellerDTO struct {
 	FullName     string           `json:"fullName" validate:"required"`
 	Bio          string           `json:"bio" validate:"required"`
-	Languages    []Language       `json:"languages" validate:"required"`
-	Skills       []Skill          `json:"skills" validate:"required"`
-	Certificates []CertificateDTO `json:"certificates" validate:"required"`
-	Educations   []EducationDTO   `json:"educations" validate:"required"`
-	Experiences  []ExperienceDTO  `json:"experiences" validate:"required"`
+	Languages    []Language       `json:"languages" validate:"required,min=1"`
+	Skills       []Skill          `json:"skills" validate:"required,min=1"`
+	Certificates []CertificateDTO `json:"certificates" validate:"required,min=1"`
+	Educations   []EducationDTO   `json:"educations" validate:"required,min=1"`
+	Experiences  []ExperienceDTO  `json:"experiences" validate:"required,min=1"`
 }
 
 func ApplyDBSetup(db *gorm.DB) error {

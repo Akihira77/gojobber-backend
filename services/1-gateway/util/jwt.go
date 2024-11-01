@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/Akihira77/gojobber/services/1-gateway/types"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -12,7 +13,7 @@ var ServiceID = "API Gateway"
 var JWT_EXPIRATION = 1 * time.Hour
 var JWT_SIGNING_METHOD = jwt.SigningMethodHS256
 
-func SigningJWT(secret string) (string, error) {
+func GenerateJWT(secret string) (string, error) {
 	claims := jwt.MapClaims{
 		"iss": ServiceID,
 	}
@@ -27,7 +28,7 @@ func SigningJWT(secret string) (string, error) {
 }
 
 func VerifyingJWT(secret string, tokenString string) (*jwt.Token, error) {
-	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &types.JWTClaims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("invalid signature")
 		}

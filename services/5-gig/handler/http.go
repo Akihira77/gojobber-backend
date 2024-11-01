@@ -19,18 +19,18 @@ import (
 )
 
 type GigHandler struct {
-	gigSvc       service.GigServiceImpl
-	validate     *validator.Validate
-	cld          *util.Cloudinary
-	grpcServices *GRPCClients
+	gigSvc     service.GigServiceImpl
+	validate   *validator.Validate
+	cld        *util.Cloudinary
+	grpcClient *GRPCClients
 }
 
 func NewGigHandler(gigSvc service.GigServiceImpl, cld *util.Cloudinary, grpcServices *GRPCClients) *GigHandler {
 	return &GigHandler{
-		gigSvc:       gigSvc,
-		validate:     validator.New(validator.WithRequiredStructEnabled()),
-		cld:          cld,
-		grpcServices: grpcServices,
+		gigSvc:     gigSvc,
+		validate:   validator.New(validator.WithRequiredStructEnabled()),
+		cld:        cld,
+		grpcClient: grpcServices,
 	}
 }
 
@@ -47,7 +47,7 @@ func (gh *GigHandler) FindGigByID(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
@@ -104,12 +104,13 @@ func (gh *GigHandler) GigQuerySearch(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "searching error")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
-		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
+		log.Printf("gig query search:\n%+v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while validating seller")
 	}
-
-	gigs, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, cc, result.Gigs)
+	userGrpcClient := user.NewUserServiceClient(cc)
+	gigs, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, userGrpcClient, result.Gigs)
 	if err != nil {
 		log.Println("gig query search", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
@@ -128,6 +129,12 @@ func (gh *GigHandler) FindSellerGigs(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 1*time.Second)
 	defer cancel()
 
+	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
+	if !ok {
+		log.Println(userInfo)
+		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
+	}
+
 	var p types.GigSearchParams
 	err := c.ParamsParser(&p)
 	if err != nil {
@@ -135,18 +142,28 @@ func (gh *GigHandler) FindSellerGigs(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "searching error")
 	}
 
-	gigs, err := gh.gigSvc.FindSellerGigs(ctx, true, c.Params("sellerId"), &p)
+	cc, err := gh.grpcClient.GetClient(types.USER_SERVICE)
+	if err != nil {
+		log.Printf("FindSellerGigs Error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while validating seller")
+	}
+	userGrpcClient := user.NewUserServiceClient(cc)
+	s, err := userGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
+		BuyerId:  userInfo.UserID,
+		SellerId: "",
+	})
+	if err != nil {
+		log.Printf("FindSellerGigs Error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while validating seller")
+	}
+
+	gigs, err := gh.gigSvc.FindSellerGigs(ctx, true, s.Id, &p)
 	if err != nil {
 		log.Println("find seller active gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
-	if err != nil {
-		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
-	}
-
-	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, cc, gigs)
+	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, userGrpcClient, gigs)
 	if err != nil {
 		log.Println("find seller active gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
@@ -175,12 +192,14 @@ func (gh *GigHandler) FindSellerInactiveGigs(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
+		log.Println("find seller inactive gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
 
-	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, cc, gigs)
+	userGrpcClient := user.NewUserServiceClient(cc)
+	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, userGrpcClient, gigs)
 	if err != nil {
 		log.Println("find seller inactive gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
@@ -209,14 +228,16 @@ func (gh *GigHandler) FindGigByCategory(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
+		log.Println("find gig by category", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
 
-	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, cc, gigs)
+	userGrpcClient := user.NewUserServiceClient(cc)
+	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, userGrpcClient, gigs)
 	if err != nil {
-		log.Println("find seller inactive gigs", err)
+		log.Println("find gig by category", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
@@ -249,14 +270,16 @@ func (gh *GigHandler) FindSimilarGigs(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
+		log.Println("find similar gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
 
-	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, cc, gigs)
+	userGrpcClient := user.NewUserServiceClient(cc)
+	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, userGrpcClient, gigs)
 	if err != nil {
-		log.Println("find seller inactive gigs", err)
+		log.Println("find similar gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
@@ -270,20 +293,29 @@ func (gh *GigHandler) GetPopularGigs(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 1*time.Second)
 	defer cancel()
 
-	gigs, err := gh.gigSvc.GetPopularGigs(ctx)
+	var p types.GigSearchParams
+	err := c.ParamsParser(&p)
+	if err != nil {
+		log.Println("find similar gigs", err)
+		return fiber.NewError(http.StatusBadRequest, "searching error")
+	}
+
+	gigs, err := gh.gigSvc.GetPopularGigs(ctx, &p)
 	if err != nil {
 		log.Println("get popular gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	cc, err := gh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
+		log.Println("get popular gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
 
-	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, cc, gigs)
+	userGrpcClient := user.NewUserServiceClient(cc)
+	result, err := gh.gigSvc.FindAndMapSellerInGigs(ctx, userGrpcClient, gigs)
 	if err != nil {
-		log.Println("find seller inactive gigs", err)
+		log.Println("get popular gigs", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching")
 	}
 
@@ -297,6 +329,12 @@ func (gh *GigHandler) Create(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 10*time.Second)
 	defer cancel()
 
+	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
+	if !ok {
+		log.Println(userInfo)
+		return fiber.NewError(http.StatusUnauthorized, "Sign-in first")
+	}
+
 	data := new(types.CreateGigDTO)
 	err := c.BodyParser(data)
 	if err != nil {
@@ -304,27 +342,29 @@ func (gh *GigHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while parsing body")
 	}
 
-	cc, err := gh.grpcServices.GetClient("USER_SERVICE")
+	err = gh.validate.Struct(data)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
+	}
+
+	cc, err := gh.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
 	}
 
 	userGrpcClient := user.NewUserServiceClient(cc)
-	_, err = userGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
-		SellerId: data.SellerID,
+	s, err := userGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
+		SellerId: "",
+		BuyerId:  userInfo.UserID,
 	})
-
 	if err != nil {
 		log.Println("create gig", err)
 		return fiber.NewError(http.StatusInternalServerError, "Invalid seller data")
 	}
 
-	err = gh.validate.Struct(data)
-	if err != nil {
-		log.Printf("create gig:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
-	}
-
+	data.SellerID = s.Id
 	formHeader, err := c.FormFile("imageFile")
 	if err != nil {
 		log.Printf("create gig:\n%+v", err)
@@ -388,8 +428,9 @@ func (gh *GigHandler) Update(c *fiber.Ctx) error {
 
 	err = gh.validate.Struct(data)
 	if err != nil {
-		log.Printf("update gig:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	if data.CoverImage == "" {

@@ -4,16 +4,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
+	"github.com/Akihira77/gojobber/services/1-gateway/config"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/storage/postgres/v3"
 	"github.com/joho/godotenv"
 )
 
@@ -24,6 +22,8 @@ func main() {
 	}
 
 	port := os.Getenv("PORT")
+	config.NewGoogleAuthConfig(port)
+
 	app := fiber.New(fiber.Config{
 		BodyLimit:     5 * 1024 * 1024,
 		CaseSensitive: true,
@@ -38,14 +38,14 @@ func main() {
 
 	fmt.Println("Connected to postgres DB", dsn)
 
-	app.Use(limiter.New(limiter.Config{
-		Max:               20,
-		Expiration:        30 * time.Second,
-		LimiterMiddleware: limiter.SlidingWindow{},
-		Storage: postgres.New(postgres.Config{
-			ConnectionURI: dsn,
-		}),
-	}))
+	// app.Use(limiter.New(limiter.Config{
+	// 	Max:               20,
+	// 	Expiration:        30 * time.Second,
+	// 	LimiterMiddleware: limiter.SlidingWindow{},
+	// 	Storage: postgres.New(postgres.Config{
+	// 		ConnectionURI: dsn,
+	// 	}),
+	// }))
 	app.Use(recover.New())
 	app.Use(compress.New(compress.Config{
 		Level: compress.LevelBestCompression,

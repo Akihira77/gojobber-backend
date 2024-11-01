@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	svc "github.com/Akihira77/gojobber/services/4-user/service"
 	"github.com/Akihira77/gojobber/services/4-user/types"
+	"github.com/Akihira77/gojobber/services/4-user/util"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/stripe/stripe-go/v80"
+	"github.com/stripe/stripe-go/v80/account"
 	"gorm.io/gorm"
 )
 
@@ -20,6 +24,7 @@ type SellerHandler struct {
 	sellerSvc svc.SellerServiceImpl
 	buyerSvc  svc.BuyerServiceImpl
 	validate  *validator.Validate
+	stripeKey string
 }
 
 func NewSellerHandler(buyerSvc svc.BuyerServiceImpl, sellerSvc svc.SellerServiceImpl) *SellerHandler {
@@ -27,6 +32,7 @@ func NewSellerHandler(buyerSvc svc.BuyerServiceImpl, sellerSvc svc.SellerService
 		sellerSvc: sellerSvc,
 		buyerSvc:  buyerSvc,
 		validate:  validator.New(validator.WithRequiredStructEnabled()),
+		stripeKey: os.Getenv("STRIPE_SECRET_KEY"),
 	}
 }
 
@@ -117,16 +123,21 @@ func (sh *SellerHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please re-signin")
 	}
 
+	if !userInfo.VerifiedUser {
+		return fiber.NewError(http.StatusForbidden, "Verify Your Email First")
+	}
+
 	data := new(types.CreateSellerDTO)
 	if err := c.BodyParser(data); err != nil {
 		fmt.Printf("%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please check again your data")
 	}
 
-	if err := sh.validate.Struct(data); err != nil {
-		fmt.Printf("%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data. Please check again your data")
-
+	err := sh.validate.Struct(data)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	sellerDataInBuyerDB, err := sh.buyerSvc.FindBuyerByID(ctx, userInfo.UserID)
@@ -135,6 +146,38 @@ func (sh *SellerHandler) Create(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusNotFound, "data does not found in buyer database")
 	}
 
+	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
+	acctParams := &stripe.AccountParams{
+		Country:      stripe.String(util.FindMyCountryCode(sellerDataInBuyerDB.Country)),
+		Email:        &sellerDataInBuyerDB.Email,
+		BusinessType: stripe.String(string(stripe.AccountBusinessTypeIndividual)),
+		Controller: &stripe.AccountControllerParams{
+			StripeDashboard: &stripe.AccountControllerStripeDashboardParams{
+				Type: stripe.String("none"),
+			},
+			Fees: &stripe.AccountControllerFeesParams{
+				Payer: stripe.String("application"),
+			},
+			Losses: &stripe.AccountControllerLossesParams{
+				Payments: stripe.String("application"),
+			},
+			RequirementCollection: stripe.String("application"),
+		}, Capabilities: &stripe.AccountCapabilitiesParams{
+			CardPayments: &stripe.AccountCapabilitiesCardPaymentsParams{
+				Requested: stripe.Bool(true),
+			},
+			Transfers: &stripe.AccountCapabilitiesTransfersParams{
+				Requested: stripe.Bool(true),
+			},
+		},
+	}
+	acc, err := account.New(acctParams)
+	if err != nil {
+		fmt.Printf("%+v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while creating seller account")
+	}
+
+	data.StripeAccountID = acc.ID
 	seller, err := sh.sellerSvc.Create(ctx, sellerDataInBuyerDB, data)
 	if err != nil {
 		fmt.Printf("%+v", err)
@@ -155,16 +198,21 @@ func (sh *SellerHandler) Update(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please re-signin")
 	}
 
+	if !userInfo.VerifiedUser {
+		return fiber.NewError(http.StatusForbidden, "Verify Your Email First")
+	}
+
 	data := new(types.UpdateSellerDTO)
 	if err := c.BodyParser(data); err != nil {
 		fmt.Printf("%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please check again your data")
 	}
 
-	if err := sh.validate.Struct(data); err != nil {
-		fmt.Printf("%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data. Please check again your data")
-
+	err := sh.validate.Struct(data)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	seller, err := sh.sellerSvc.FindSellerByBuyerID(ctx, userInfo.UserID)

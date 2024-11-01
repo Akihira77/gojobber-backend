@@ -20,12 +20,13 @@ type SellerService struct {
 
 type SellerServiceImpl interface {
 	FindSellerByID(ctx context.Context, id string) (*types.SellerDTO, error)
-	FindSellerOverviewByID(ctx context.Context, id string) (*types.SellerOverview, error)
+	FindSellerOverviewByID(ctx context.Context, buyerId, sellerId string) (*types.SellerOverview, error)
 	FindSellerByBuyerID(ctx context.Context, buyerId string) (*types.Seller, error)
 	FindSellerByUsername(ctx context.Context, username string) (*types.SellerDTO, error)
 	GetRandomSellers(ctx context.Context, count int) ([]types.SellerDTO, error)
 	Create(ctx context.Context, sellerDataInBuyerDB *types.Buyer, data *types.CreateSellerDTO) (*types.SellerDTO, error)
 	Update(ctx context.Context, updatedSellerData *types.Seller, data *types.UpdateSellerDTO) error
+	UpdateBalance(ctx context.Context, sellerID string, addedBalance uint64) (*types.SellerIncBalanceDTO, error)
 }
 
 func NewSellerService(db *gorm.DB) SellerServiceImpl {
@@ -186,13 +187,23 @@ func (ss *SellerService) FindSellerByBuyerID(ctx context.Context, buyerId string
 	return &seller, result.Error
 }
 
-func (ss *SellerService) FindSellerOverviewByID(ctx context.Context, id string) (*types.SellerOverview, error) {
+func (ss *SellerService) FindSellerOverviewByID(ctx context.Context, buyerId, sellerId string) (*types.SellerOverview, error) {
 	var seller types.SellerOverview
 	result := ss.db.
 		Debug().
 		WithContext(ctx).
 		Model(&types.Seller{}).
-		First(&seller, "id = ?", id)
+		Select(`
+            sellers.id,
+			sellers.full_name, 
+			buyers.email, 
+			sellers.ratings_count, 
+			sellers.rating_sum, 
+			sellers.rating_categories,
+            sellers.stripe_account_id
+		`).
+		Joins("INNER JOIN buyers ON buyers.id = sellers.buyer_id").
+		First(&seller, "sellers.id = ? OR sellers.buyer_id = ?", sellerId, buyerId)
 
 	return &seller, result.Error
 }
@@ -370,7 +381,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 		goRoutineSize := 5
 		errCh := make(chan error, goRoutineSize)
 
-		//NOTE: 1. GRAB SELLER LANGUAGES
+		//INFO: 1. GRAB SELLER LANGUAGES
 		wg.Add(1)
 		var sellerLanguages []types.Language
 		go func() {
@@ -387,7 +398,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		//NOTE: 2. GRAB SELLER SKILLS
+		//INFO: 2. GRAB SELLER SKILLS
 		wg.Add(1)
 		var sellerSkills []types.Skill
 		go func() {
@@ -404,7 +415,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		//NOTE: 3. GRAB SELLER EDUCATIONS
+		//INFO: 3. GRAB SELLER EDUCATIONS
 		wg.Add(1)
 		var sellerEducations []types.EducationDTO
 		go func() {
@@ -419,7 +430,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		//NOTE: 4. GRAB SELLER CERTIFICATES
+		//INFO: 4. GRAB SELLER CERTIFICATES
 		wg.Add(1)
 		var sellerCertificates []types.CertificateDTO
 		go func() {
@@ -434,7 +445,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		//NOTE: 5. GRAB SELLER EXPERIENCES
+		//INFO: 5. GRAB SELLER EXPERIENCES
 		wg.Add(1)
 		var sellerExperiences []types.ExperienceDTO
 		go func() {
@@ -449,10 +460,9 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 			errCh <- nil
 		}()
 
-		// Wait for all goroutines to finish
 		go func() {
 			wg.Wait()
-			close(errCh) // Close the error channel after all goroutines are done
+			close(errCh)
 		}()
 
 		for err := range errCh {
@@ -485,6 +495,7 @@ func (ss *SellerService) GetRandomSellers(ctx context.Context, total int) ([]typ
 
 func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.Buyer, data *types.CreateSellerDTO) (*types.SellerDTO, error) {
 	tx := ss.db.
+		Debug().
 		WithContext(ctx).
 		Begin(&sql.TxOptions{})
 
@@ -502,6 +513,8 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 			Four:  0,
 			Five:  0,
 		},
+		StripeAccountID: data.StripeAccountID,
+		AccountBalance:  0,
 	}
 	result := tx.
 		Model(&types.Seller{}).
@@ -515,7 +528,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 	var educations []types.EducationDTO
 	var certificates []types.CertificateDTO
 
-	//NOTE: 1. SAVE LANGUAGES
+	//INFO: 1. SAVE LANGUAGES
 	for _, lang := range data.Languages {
 		result = tx.
 			Model(&types.Language{}).
@@ -540,7 +553,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 		}
 	}
 
-	//NOTE: 2. SAVE SKILLS
+	//INFO: 2. SAVE SKILLS
 	for _, skill := range data.Skills {
 		result = tx.
 			Model(&types.Skill{}).
@@ -561,7 +574,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 		}
 	}
 
-	//NOTE: 3. SAVE EDUCATIONS
+	//INFO: 3. SAVE EDUCATIONS
 	for _, education := range data.Educations {
 		edu := types.Education{
 			Title:      education.Title,
@@ -587,7 +600,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 		})
 	}
 
-	//NOTE: 4. SAVE CERTIFICATES
+	//INFO: 4. SAVE CERTIFICATES
 	for _, certif := range data.Certificates {
 		cert := types.Certificate{
 			Name:     certif.Name,
@@ -611,7 +624,7 @@ func (ss *SellerService) Create(ctx context.Context, sellerDataInBuyerDB *types.
 		})
 	}
 
-	//NOTE: 5. SAVE EXPERIENCES
+	//INFO: 5. SAVE EXPERIENCES
 	for _, experience := range data.Experiences {
 		exp := types.Experience{
 			Title:                experience.Title,
@@ -867,4 +880,40 @@ func (ss *SellerService) Update(ctx context.Context, updatedSellerData *types.Se
 	result = tx.Commit()
 
 	return result.Error
+}
+
+func (ss *SellerService) UpdateBalance(ctx context.Context, sellerID string, addedBalance uint64) (*types.SellerIncBalanceDTO, error) {
+	type Result struct {
+		types.Seller
+		Email string `json:"email" gorm:"email"`
+	}
+	var resultData Result
+
+	result := ss.db.
+		Debug().
+		WithContext(ctx).
+		Raw(`
+            UPDATE sellers
+            SET account_balance = account_balance + ?
+            FROM buyers
+            WHERE sellers.id = ? AND buyers.id = sellers.buyer_id
+            RETURNING sellers.*, buyers.email AS email
+        `, addedBalance, sellerID).
+		Scan(&resultData)
+
+	if resultData.Email == "" {
+		return nil, fmt.Errorf("Seller data is not found")
+	}
+
+	return &types.SellerIncBalanceDTO{
+		ID:               resultData.Seller.ID,
+		FullName:         resultData.Seller.FullName,
+		Email:            resultData.Email,
+		Bio:              resultData.Seller.Bio,
+		AccountBalance:   resultData.Seller.AccountBalance,
+		RatingSum:        resultData.Seller.RatingSum,
+		RatingsCount:     resultData.Seller.RatingsCount,
+		RatingCategories: resultData.Seller.RatingCategories,
+		StripeAccountID:  resultData.Seller.StripeAccountID,
+	}, result.Error
 }

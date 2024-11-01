@@ -135,3 +135,41 @@ func ForgotPasswordMail(errCh chan<- error, to, subject, resetLink, username str
 	errCh <- SendMail(to, subject, body.String())
 	return
 }
+
+func SellerOrderHasCompleted(errCh chan<- error, to, subject, buyerEmail, orderID, currentBalance string) {
+	dir, err := os.Getwd()
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	//TODO: IMPLEMENT EMAIL HTML TEMPLATE FOR SELLER ORDER COMPLETED
+	tmpl, err := template.ParseFiles(fmt.Sprintf("%s/emails/sellerOrderCompleted.html", dir))
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	data := &struct {
+		AppLink              string
+		AppIcon              string
+		OrderID              string
+		BuyerEmail           string
+		SellerCurrentBalance string
+	}{
+		AppLink:              os.Getenv("CLIENT_URL"),
+		AppIcon:              "https://i.ibb.co/Kyp2m0t/cover.png",
+		OrderID:              orderID,
+		BuyerEmail:           buyerEmail,
+		SellerCurrentBalance: currentBalance,
+	}
+
+	var body bytes.Buffer
+	if err := tmpl.Execute(&body, data); err != nil {
+		errCh <- err
+		return
+	}
+
+	errCh <- SendMail(to, subject, body.String())
+	return
+}

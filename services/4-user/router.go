@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	httpHandler "github.com/Akihira77/gojobber/services/4-user/handler/http"
-	svc "github.com/Akihira77/gojobber/services/4-user/service"
+	"github.com/Akihira77/gojobber/services/4-user/handler/http"
+	"github.com/Akihira77/gojobber/services/4-user/service"
 	"github.com/Akihira77/gojobber/services/4-user/types"
 	"github.com/Akihira77/gojobber/services/4-user/util"
 	"github.com/gofiber/fiber/v2"
@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	BASE_PATH = "/api/v1/user"
+	BASE_PATH = "/api/v1/users"
 )
 
 func MainRouter(db *gorm.DB, app *fiber.App) {
@@ -30,21 +30,26 @@ func MainRouter(db *gorm.DB, app *fiber.App) {
 	api.Use(verifyGatewayReq)
 	api.Use(authOnly)
 
-	bs := svc.NewBuyerService(db)
-	bh := httpHandler.NewBuyerHandler(bs)
+	bs := service.NewBuyerService(db)
+	bh := handler.NewBuyerHandler(bs)
 
-	api.Get("/buyer/my-info", bh.GetMyBuyerInfo)
-	api.Get("/buyer/:username", bh.FindBuyerByUsername)
+	api.Get("/buyers/my-info", bh.GetMyBuyerInfo)
+	api.Get("/buyers/:username", bh.FindBuyerByUsername)
+	api.Put("/buyers", bh.Update)
 
-	ss := svc.NewSellerService(db)
-	sh := httpHandler.NewSellerHandler(bs, ss)
+	ss := service.NewSellerService(db)
+	sh := handler.NewSellerHandler(bs, ss)
 
-	api.Get("/seller/my-info", sh.GetMySellerInfo)
-	api.Get("/seller/id/:id", sh.FindSellerByID)
-	api.Get("/seller/username/:username", sh.FindSellerByUsername)
-	api.Get("/seller/random/:count", sh.GetRandomSellers)
-	api.Post("/seller", sh.Create)
-	api.Put("/seller", sh.Update)
+	api.Get("/sellers/my-info", sh.GetMySellerInfo)
+	api.Get("/sellers/id/:id", sh.FindSellerByID)
+	api.Get("/sellers/username/:username", sh.FindSellerByUsername)
+	api.Get("/sellers/random/:count", sh.GetRandomSellers)
+	api.Post("/sellers", sh.Create)
+	api.Put("/sellers", sh.Update)
+	// api.Delete("/sellers/connect/:id", sh.DeleteStripeConnectAccount)
+
+	//TODO: IMPLEMENT BALANCE RELATED STUFF
+	api.Post("/sellers/balance/withdraw", nil)
 }
 
 func verifyGatewayReq(c *fiber.Ctx) error {
@@ -91,8 +96,9 @@ func authOnly(c *fiber.Ctx) error {
 	}
 
 	claims, ok := token.Claims.(*types.JWTClaims)
+	log.Println(claims)
 	if !ok {
-		log.Println("token is not matched with claims: claims", token.Claims)
+		log.Println("token is not matched with claims")
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 

@@ -13,15 +13,16 @@ var ServiceID = "Auth"
 var JWT_EXPIRATION = 1 * time.Hour
 var JWT_SIGNING_METHOD = jwt.SigningMethodHS256
 
-func SigningJWT(secret string, userId string, email string, username string) (string, error) {
+func GenerateJWT(secret string, userId string, email string, username string, verifiedStatus bool) (string, error) {
 	claims := &types.JWTClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    ServiceID,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(JWT_EXPIRATION)),
 		},
-		UserID:   userId,
-		Email:    email,
-		Username: username,
+		UserID:       userId,
+		Email:        email,
+		Username:     username,
+		VerifiedUser: verifiedStatus,
 	}
 	token := jwt.NewWithClaims(JWT_SIGNING_METHOD, claims)
 	signedToken, err := token.SignedString([]byte(secret))

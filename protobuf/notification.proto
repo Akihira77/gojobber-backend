@@ -2,6 +2,7 @@ syntax = "proto3";
 
 option go_package="github.com/Akihira77/common/notification";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 //INFO: AUTH SERVICE
 message VerifyingEmailRequest {
@@ -30,13 +31,86 @@ message EmailChatNotificationRequest {
     string message = 3;
 }
 
+//INFO: ORDER SERVICE
+message SellerCompletedAnOrderRequest {
+    string receiverEmail = 1;
+    string buyerEmail = 2;
+    string orderId = 3;
+    string sellerCurrentBalance = 4;
+    string url = 5;
+}
+
+message SellerDeadlineExtensionRequest {
+    string receiverEmail = 1;
+    string url = 2;
+}
+
+message SellerCancelOrderRequest {
+    string receiverEmail = 1;
+    string url = 2;
+}
+
+message BuyerDeadlineExtension {
+    string receiverEmail = 1;
+    string url = 2;
+}
+
+message BuyerRefundsOrderRequest {
+    string receiverEmail = 1;
+    string url = 2;
+}
+
+message OrderDetail {
+    string gigTitle = 1;
+    string gigDescription = 2;
+    uint64 price = 3;
+    uint64 serviceFee = 4;
+    google.protobuf.Timestamp deadline = 5;
+}
+
+message NotifySellerGotAnOrderRequest {
+    string receiverEmail = 1;
+    string message = 2;
+    OrderDetail detail = 3;
+}
+
+message NotifySellerGotAReviewRequest {
+    string receiverEmail = 1;
+    string message = 2;
+}
+
+message NotifyBuyerOrderDeliveredRequest {
+    string receiverEmail = 1;
+    string url = 2;
+}
+
+message NotifyBuyerOrderAcknowledgeRequest {
+    string receiverEmail = 1;
+    string url = 2;
+}
+
+message NotifySellerBuyerResponseDeliveredOrderRequest {
+    string receiverEmail = 1;
+}
+
 service NotificationService {
-    // From Auth Service
+//NOTE: From Auth Service
     rpc UserVerifyingEmail(VerifyingEmailRequest) returns (google.protobuf.Empty) {}
     rpc UserForgotPassword(ForgotPasswordRequest) returns (google.protobuf.Empty) {}
     rpc UserSucessResetPassword(SuccessResetPasswordRequest) returns (google.protobuf.Empty) {}
 
-
-    // From Chat Service
+//NOTE: From Chat Service
     rpc SendEmailChatNotification(EmailChatNotificationRequest) returns (google.protobuf.Empty) {}
+
+//NOTE: From Order Service
+    rpc SellerHasCompletedAnOrder(SellerCompletedAnOrderRequest) returns (google.protobuf.Empty) {}
+    rpc SellerRequestDeadlineExtension(SellerDeadlineExtensionRequest) returns (google.protobuf.Empty) {}
+    rpc SellerCanceledAnOrder(SellerCancelOrderRequest) returns (google.protobuf.Empty) {}
+    rpc BuyerDeadlineExtensionResponse(BuyerDeadlineExtension) returns (google.protobuf.Empty) {}
+    rpc BuyerRefundsAnOrder(BuyerRefundsOrderRequest) returns (google.protobuf.Empty) {}
+    rpc NotifySellerOrderHasBeenMade(NotifySellerGotAnOrderRequest) returns (google.protobuf.Empty) {}
+    rpc NotifySellerGotAReview(NotifySellerGotAReviewRequest) returns (google.protobuf.Empty) {}
+    rpc NotifyBuyerSellerDeliveredOrder(NotifyBuyerOrderDeliveredRequest) returns (google.protobuf.Empty) {}
+    rpc NotifyBuyerOrderHasAcknowledged(NotifyBuyerOrderAcknowledgeRequest) returns (google.protobuf.Empty) {}
+    rpc NotifySellerBuyerResponseDeliveredOrder(NotifySellerBuyerResponseDeliveredOrderRequest) returns (google.protobuf.Empty) {}
 }

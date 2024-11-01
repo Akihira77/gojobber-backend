@@ -12,26 +12,26 @@ import (
 	"github.com/Akihira77/gojobber/services/6-chat/service"
 	"github.com/Akihira77/gojobber/services/6-chat/types"
 	"github.com/Akihira77/gojobber/services/6-chat/util"
-	"github.com/Akihira77/gojobber/services/common/genproto/auth"
 	"github.com/Akihira77/gojobber/services/common/genproto/notification"
+	"github.com/Akihira77/gojobber/services/common/genproto/user"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
 type ChatHandler struct {
-	cs           service.ChatServiceImpl
-	validate     *validator.Validate
-	cld          *util.Cloudinary
-	grpcServices *GRPCClients
+	cs         service.ChatServiceImpl
+	validate   *validator.Validate
+	cld        *util.Cloudinary
+	grpcClient *GRPCClients
 }
 
 func NewChatHandler(cld *util.Cloudinary, cs service.ChatServiceImpl, grpcServices *GRPCClients) *ChatHandler {
 	return &ChatHandler{
-		cs:           cs,
-		validate:     validator.New(validator.WithRequiredStructEnabled()),
-		cld:          cld,
-		grpcServices: grpcServices,
+		cs:         cs,
+		validate:   validator.New(validator.WithRequiredStructEnabled()),
+		cld:        cld,
+		grpcClient: grpcServices,
 	}
 }
 
@@ -55,7 +55,7 @@ func (ch *ChatHandler) GetAllMyConversations(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching conversations data")
 	}
 
-	cc, err := ch.grpcServices.GetClient("AUTH_SERVICE")
+	cc, err := ch.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		fmt.Printf("Get All My Conversations Error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error while searching conversations data")
@@ -63,7 +63,7 @@ func (ch *ChatHandler) GetAllMyConversations(c *fiber.Ctx) error {
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(conversations))
-	authGrpcClient := auth.NewAuthServiceClient(cc)
+	userGrpcClient := user.NewUserServiceClient(cc)
 
 	for i := range conversations {
 		wg.Add(1)
@@ -77,17 +77,17 @@ func (ch *ChatHandler) GetAllMyConversations(c *fiber.Ctx) error {
 				userId = conversations[idx].UserTwoID
 			}
 
-			u, err := authGrpcClient.FindUserByUserID(newCtx, &auth.FindUserRequest{
-				UserId: userId,
+			b, err := userGrpcClient.FindBuyer(newCtx, &user.FindBuyerRequest{
+				BuyerId: userId,
 			})
 			if err != nil {
 				errCh <- err
 				return
 			}
 
-			conversations[idx].SenderName = u.Username
-			conversations[idx].SenderEmail = u.Email
-			conversations[idx].SenderProfilePicture = u.ProfilePicture
+			conversations[idx].SenderName = b.Username
+			conversations[idx].SenderEmail = b.Email
+			conversations[idx].SenderProfilePicture = b.ProfilePicture
 
 			errCh <- nil
 		}(i)
@@ -108,6 +108,7 @@ func (ch *ChatHandler) GetAllMyConversations(c *fiber.Ctx) error {
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"conversations": conversations,
+		"total":         len(conversations),
 	})
 }
 
@@ -126,6 +127,7 @@ func (ch *ChatHandler) GetMessagesInsideConversation(c *fiber.Ctx) error {
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"conversation": chat,
+		"total":        len(chat),
 	})
 }
 
@@ -146,24 +148,37 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "Error reading request body")
 	}
 
-	if err := ch.validate.Struct(data); err != nil {
-		fmt.Printf("InsertMessage Error:\n+%v", err)
-		return fiber.NewError(http.StatusBadRequest, "Error validating request body")
-	}
-
-	cc, err := ch.grpcServices.GetClient("AUTH_SERVICE")
-	authGrpcClient := auth.NewAuthServiceClient(cc)
+	cc, err := ch.grpcClient.GetClient(types.USER_SERVICE)
+	userGrpcClient := user.NewUserServiceClient(cc)
 	if err != nil {
 		fmt.Printf("InsertMessage Error:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "Error saving message")
 	}
 
-	_, err = authGrpcClient.FindUserByUserID(ctx, &auth.FindUserRequest{
-		UserId: data.ReceiverID,
+	if data.Offer != nil {
+		_, err = userGrpcClient.FindSeller(ctx, &user.FindSellerRequest{
+			SellerId: userInfo.UserID,
+		})
+		if err != nil {
+			fmt.Printf("InsertMessage Error:\n+%v", err)
+			return fiber.NewError(http.StatusBadRequest, "Non Seller User Can Make An Offer To Another User")
+		}
+	}
+
+	receiverUser, err := userGrpcClient.FindBuyer(ctx, &user.FindBuyerRequest{
+		BuyerId: data.ReceiverID,
 	})
 	if err != nil {
 		fmt.Printf("InsertMessage Error:\n+%v", err)
 		return fiber.NewError(http.StatusBadRequest, err.Error())
+	}
+
+	data.ReceiverEmail = receiverUser.Email
+	err = ch.validate.Struct(data)
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	formHeader, err := c.FormFile("file")
@@ -180,7 +195,7 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 		}
 
 		filePath := util.RandomStr(64)
-		//NOTE: IDK IF IT IS CORRECT HEADER
+		//FIX: IDK IF IT IS CORRECT HEADER
 		uploadResult, err := ch.cld.UploadFile(ctx, formHeader, data.File, filePath, formHeader.Header.Get("file-type"))
 		if err != nil {
 			fmt.Printf("InsertMessage Error:\n+%v", err)
@@ -190,40 +205,69 @@ func (ch *ChatHandler) InsertMessage(c *fiber.Ctx) error {
 		data.FileURL = uploadResult.SecureURL
 	}
 
-	result, err := ch.cs.InsertMessage(ctx, userInfo.UserID, data)
+	chat, err := ch.cs.InsertMessage(ctx, userInfo.UserID, data)
 	if err != nil {
 		fmt.Printf("InsertMessage Error:\n+%v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error saving your chat")
 	}
 
-	message := ""
-	if result.Offer != nil {
-		//TODO: SET HTML TEMPLATE FOR INFORMATION ABOUT THE OFFER
-		message = fmt.Sprintf("You receive a Gig Offer from seller: %s", userInfo.Email)
+	go func() {
+		if chat.Offer == nil {
+			return
+		}
+
+		cc, err = ch.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
+		if err != nil {
+			fmt.Printf("InsertMessage Error:\n+%v", err)
+			return
+		}
+
+		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
+		_, err = notificationGrpcClient.SendEmailChatNotification(context.TODO(), &notification.EmailChatNotificationRequest{
+			ReceiverEmail: data.ReceiverEmail,
+			SenderEmail:   userInfo.Email,
+			Message:       fmt.Sprintf("You receive a Gig Offer from seller: %s", userInfo.Email),
+		})
+		if err != nil {
+			fmt.Printf("InsertMessage Error:\n+%v", err)
+			return
+		}
+	}()
+
+	unreadMessages := ch.cs.CalculateUnreadMessages(ctx, chat.ConversationID, userInfo.UserID)
+
+	return c.Status(http.StatusCreated).JSON(fiber.Map{
+		"senderId":       userInfo.UserID,
+		"receiver":       receiverUser,
+		"unreadMessages": unreadMessages,
+		"chat":           chat,
+	})
+}
+
+func (ch *ChatHandler) SellerCancelOffer(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.UserContext(), 5*time.Second)
+	defer cancel()
+
+	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
+	if !ok {
+		log.Println(userInfo)
+		return fiber.NewError(http.StatusUnauthorized, "Sender data is invalid")
 	}
 
-	cc, err = ch.grpcServices.GetClient("NOTIFICATION_SERVICE")
+	m, err := ch.cs.FindMessageByID(ctx, c.Params("messageId"))
 	if err != nil {
-		fmt.Printf("InsertMessage Error:\n+%v", err)
+		fmt.Printf("SellerCancelOffer Error:\n+%v", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fiber.NewError(http.StatusNotFound, "Message is not found")
+		}
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
 	}
 
-	go func() {
-		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
-		notificationGrpcClient.SendEmailChatNotification(context.TODO(), &notification.EmailChatNotificationRequest{
-			ReceiverEmail: data.ReceiverEmail,
-			SenderEmail:   userInfo.Email,
-			Message:       message,
-		})
+	err = ch.cs.ChangeOfferStatus(ctx, m, types.CANCELED)
+	if err != nil {
+		fmt.Printf("SellerCancelOffer Error:\n+%v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
+	}
 
-	}()
-
-	// if err != nil {
-	// 	fmt.Printf("InsertMessage Error:\n+%v", err)
-	// 	return fiber.NewError(http.StatusInternalServerError, "Error sending email")
-	// }
-
-	return c.Status(http.StatusCreated).JSON(fiber.Map{
-		"chat": result,
-	})
+	return c.SendStatus(http.StatusOK)
 }

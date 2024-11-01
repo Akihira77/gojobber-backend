@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	svc "github.com/Akihira77/gojobber/services/3-auth/service"
@@ -14,24 +15,25 @@ import (
 	"github.com/Akihira77/gojobber/services/3-auth/util"
 	"github.com/Akihira77/gojobber/services/common/genproto/notification"
 	"github.com/Akihira77/gojobber/services/common/genproto/user"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
 type AuthHttpHandler struct {
-	validate     *validator.Validate
-	authSvc      svc.AuthServiceImpl
-	cld          *util.Cloudinary
-	grpcServices *GRPCClients
+	validate   *validator.Validate
+	authSvc    svc.AuthServiceImpl
+	cld        *util.Cloudinary
+	grpcClient *GRPCClients
 }
 
 func NewAuthHttpHandler(authSvc svc.AuthServiceImpl, cld *util.Cloudinary, grpcServices *GRPCClients) *AuthHttpHandler {
 	return &AuthHttpHandler{
-		validate:     validator.New(validator.WithRequiredStructEnabled()),
-		authSvc:      authSvc,
-		cld:          cld,
-		grpcServices: grpcServices,
+		validate:   validator.New(validator.WithRequiredStructEnabled()),
+		authSvc:    authSvc,
+		cld:        cld,
+		grpcClient: grpcServices,
 	}
 }
 
@@ -58,8 +60,9 @@ func (ah *AuthHttpHandler) SignIn(c *fiber.Ctx) error {
 
 	err := ah.validate.Struct(data)
 	if err != nil {
-		fmt.Printf("signin error: \n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data. Please correct your data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	u, err := ah.authSvc.FindUserByUsernameOrEmailIncPassword(ctx, data.Username)
@@ -71,23 +74,20 @@ func (ah *AuthHttpHandler) SignIn(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "signin failed")
 	}
 
-	err = util.CheckPasswordHash(data.Password, u.Password)
-	if err != nil {
-		fmt.Printf("signin error: \n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "password did not matched")
+	if c.Query("via") != "google" {
+		err = util.CheckPasswordHash(data.Password, u.Password)
+		if err != nil {
+			fmt.Printf("signin error: \n%+v", err)
+			return fiber.NewError(http.StatusBadRequest, "password did not matched")
+		}
 	}
 
-	token, err := util.SigningJWT(os.Getenv("JWT_SECRET"), u.ID, u.Email, u.Username)
+	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), u.ID, u.Email, u.Username, u.EmailVerified)
 	if err != nil {
 		fmt.Printf("signin error: \n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "signin failed")
 	}
 
-	c.Cookie(&fiber.Cookie{
-		Name:    "token",
-		Value:   token,
-		Expires: time.Now().Add(1 * time.Hour),
-	})
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"user": types.AuthExcludePassword{
 			ID:             u.ID,
@@ -114,75 +114,108 @@ func (ah *AuthHttpHandler) SignUp(c *fiber.Ctx) error {
 
 	err := ah.validate.Struct(data)
 	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
-	}
-
-	formHeader, err := c.FormFile("avatar")
-	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "failed reading avatar file")
-	}
-
-	if formHeader.Size > 2*1024*1024 {
-		log.Printf("signup error. File is too large")
-		return fiber.NewError(http.StatusBadRequest, "file is larger than 2MB")
-	}
-
-	if !util.ValidateImgExtension(formHeader) {
-		log.Println("signup error file type is unsupported")
-		return fiber.NewError(http.StatusBadRequest, "file type is unsupported")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	u, err := ah.authSvc.FindUserByUsernameOrEmail(ctx, data.Username)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Printf("signup error:\n%+v", err)
-		return fiber.ErrInternalServerError
+		return fiber.NewError(http.StatusInternalServerError, "Error while validating your data")
 	}
 
 	if u.ID != "" {
 		return fiber.NewError(http.StatusBadRequest, "user already exists")
 	}
 
-	data.File, err = formHeader.Open()
-	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "failed reading avatar file")
+	var uploadResult *uploader.UploadResult
+	destroyUploadredResult := func() {
+		if uploadResult == nil || uploadResult.PublicID == "" {
+			go ah.cld.Destroy(context.TODO(), uploadResult.PublicID)
+		}
+	}
+	if data.ProfilePicture == "" {
+		formHeader, err := c.FormFile("avatar")
+		if err != nil {
+			log.Printf("signup error:\n%+v", err)
+			return fiber.NewError(http.StatusBadRequest, "failed reading avatar file")
+		}
+
+		if formHeader.Size > 2*1024*1024 {
+			log.Printf("signup error. File is too large")
+			return fiber.NewError(http.StatusBadRequest, "file is larger than 2MB")
+		}
+
+		if !util.ValidateImgExtension(formHeader) {
+			log.Println("signup error file type is unsupported")
+			return fiber.NewError(http.StatusBadRequest, "file type is unsupported")
+		}
+
+		errCh := make(chan error, 1)
+		var wg sync.WaitGroup
+
+		wg.Add(1)
+		go func() {
+			log.Println("Upload Image")
+			defer wg.Done()
+
+			data.Avatar, err = formHeader.Open()
+			if err != nil {
+				log.Printf("error opening avatar file:\n%+v", err)
+				errCh <- fmt.Errorf("failed reading avatar file")
+				return
+			}
+
+			str := util.RandomStr(32)
+			uploadResult, err = ah.cld.UploadImg(ctx, data.Avatar, str)
+			if err != nil {
+				log.Printf("error saving avatar file:\n%+v", err)
+				errCh <- fmt.Errorf("failed upload file")
+				return
+			}
+
+			errCh <- nil
+			return
+		}()
+
+		go func() {
+			wg.Wait()
+			close(errCh)
+		}()
+		for err := range errCh {
+			if err != nil {
+				log.Printf("signup error:\n%+v", err)
+				destroyUploadredResult()
+				return fiber.NewError(http.StatusInternalServerError, "Error while saving your data")
+			}
+		}
+
+		data.ProfilePicture = uploadResult.SecureURL
+		data.ProfilePublicID = uploadResult.PublicID
 	}
 
-	str := util.RandomStr(32)
-	uploadResult, err := ah.cld.UploadImg(ctx, data.File, str)
+	cc, err := ah.grpcClient.GetClient(types.USER_SERVICE)
 	if err != nil {
 		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "failed upload file")
-	}
-
-	data.ProfilePicture = uploadResult.SecureURL
-	data.ProfilePublicID = uploadResult.PublicID
-	cc, err := ah.grpcServices.GetClient("USER_SERVICE")
-	if err != nil {
-		return fiber.NewError(http.StatusInternalServerError, "Error while searching gig")
+		destroyUploadredResult()
+		return fiber.NewError(http.StatusInternalServerError, "Error while saving your data")
 	}
 
 	userGrpcClient := user.NewUserServiceClient(cc)
 	result, err := ah.authSvc.Create(ctx, data, userGrpcClient)
 	if err != nil {
 		log.Printf("signup error:\n%+v", err)
-		ah.cld.Destroy(context.Background(), uploadResult.PublicID)
-		return fiber.NewError(http.StatusBadRequest, "signup failed")
+		destroyUploadredResult()
+		return fiber.NewError(http.StatusInternalServerError, "Error while saving your data")
 	}
 
-	token, err := util.SigningJWT(os.Getenv("JWT_SECRET"), result.ID, result.Email, result.Username)
+	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), result.ID, result.Email, result.Username, result.EmailVerified)
 	if err != nil {
-		log.Printf("signup error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "error generating JWT")
+		fmt.Printf("signup error: \n%+v", err)
+		return fiber.NewError(http.StatusInternalServerError, "Error while generating response")
 	}
 
-	c.Cookie(&fiber.Cookie{
-		Name:    "token",
-		Value:   token,
-		Expires: time.Now().Add(1 * time.Hour),
-	})
 	return c.Status(http.StatusCreated).JSON(fiber.Map{
 		"user": types.AuthExcludePassword{
 			ID:             result.ID,
@@ -203,17 +236,12 @@ func (ah *AuthHttpHandler) RefreshToken(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 
-	token, err := util.SigningJWT(os.Getenv("JWT_SECRET"), userInfo.UserID, userInfo.Email, userInfo.Username)
+	token, err := util.GenerateJWT(os.Getenv("JWT_SECRET"), userInfo.UserID, userInfo.Email, userInfo.Username, userInfo.VerifiedUser)
 	if err != nil {
 		log.Printf("refreshtoken:\n%+v", err)
 		return fiber.NewError(http.StatusBadRequest, "failed refresh the token")
 	}
 
-	c.Cookie(&fiber.Cookie{
-		Name:    "token",
-		Value:   token,
-		Expires: time.Now().Add(1 * time.Hour),
-	})
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"token": token,
 		"user":  userInfo,
@@ -236,10 +264,10 @@ func (ah *AuthHttpHandler) VerifyEmail(c *fiber.Ctx) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fiber.NewError(http.StatusNotFound, "user did not found")
 		}
-		return fiber.ErrInternalServerError
+		return fiber.NewError(http.StatusInternalServerError, "Error while searching your data")
 	}
 
-	result, err := ah.authSvc.UpdateEmailVerification(ctx, userInfo.UserID, true)
+	result, err := ah.authSvc.UpdateEmailVerification(ctx, userInfo.UserID, true, "")
 	if err != nil {
 		log.Printf("verifyemail error:\n%+v", err)
 		return fiber.ErrInternalServerError
@@ -259,7 +287,7 @@ func (ah *AuthHttpHandler) SendVerifyEmailURL(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusBadRequest, "invalid data. Please re-signin")
 	}
 
-	cc, err := ah.grpcServices.GetClient("NOTIFICATION_SERVICE")
+	cc, err := ah.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 	if err != nil {
 		log.Printf("sendverifyemail error:\n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Error sending email")
@@ -275,17 +303,15 @@ func (ah *AuthHttpHandler) SendVerifyEmailURL(c *fiber.Ctx) error {
 	go func() {
 		verifURL := fmt.Sprintf("%s/confirm_email?v_token=%s", os.Getenv("CLIENT_URL"), randStr)
 		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
-		notificationGrpcClient.UserVerifyingEmail(context.TODO(), &notification.VerifyingEmailRequest{
+		_, err = notificationGrpcClient.UserVerifyingEmail(context.TODO(), &notification.VerifyingEmailRequest{
 			ReceiverEmail:    userInfo.Email,
 			HtmlTemplateName: "verifyEmail",
 			VerifyLink:       verifURL,
 		})
+		if err != nil {
+			log.Printf("Error sending notification email:\n%+v", err)
+		}
 	}()
-
-	// if err != nil {
-	// 	fmt.Printf("sendforgotpasswordurl error:\n%+v", err)
-	// 	return fiber.NewError(http.StatusInternalServerError, "Error sending verify email URL to your email")
-	// }
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"message": "verify email URL has been send to your email",
@@ -306,7 +332,7 @@ func (ah *AuthHttpHandler) SendForgotPasswordURL(c *fiber.Ctx) error {
 		return fiber.ErrInternalServerError
 	}
 
-	cc, err := ah.grpcServices.GetClient("NOTIFICATION_SERVICE")
+	cc, err := ah.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 	if err != nil {
 		fmt.Printf("sendforgotpasswordurl error:\n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
@@ -322,18 +348,16 @@ func (ah *AuthHttpHandler) SendForgotPasswordURL(c *fiber.Ctx) error {
 	go func() {
 		resetPassURL := fmt.Sprintf("%s/reset-password?token=%s", os.Getenv("CLIENT_URL"), randStr)
 		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
-		notificationGrpcClient.UserForgotPassword(context.TODO(), &notification.ForgotPasswordRequest{
+		_, err = notificationGrpcClient.UserForgotPassword(context.TODO(), &notification.ForgotPasswordRequest{
 			ReceiverEmail:    user.Email,
 			HtmlTemplateName: "resetPassword",
 			Username:         user.Username,
 			ResetLink:        resetPassURL,
 		})
+		if err != nil {
+			fmt.Printf("sendforgotpasswordurl error:\n%+v", err)
+		}
 	}()
-
-	// if err != nil {
-	// 	fmt.Printf("sendforgotpasswordurl error:\n%+v", err)
-	// 	return fiber.NewError(http.StatusInternalServerError, "Error sending forgot password URL to your email")
-	// }
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"message": "email has been sent to your email",
@@ -354,8 +378,9 @@ func (ah *AuthHttpHandler) ResetPassword(c *fiber.Ctx) error {
 
 	err := ah.validate.Struct(obj)
 	if err != nil {
-		fmt.Printf("resetpassword error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	if obj.Password != obj.ConfirmPassword {
@@ -388,7 +413,7 @@ func (ah *AuthHttpHandler) ResetPassword(c *fiber.Ctx) error {
 		return fiber.ErrInternalServerError
 	}
 
-	cc, err := ah.grpcServices.GetClient("NOTIFICATION_SERVICE")
+	cc, err := ah.grpcClient.GetClient(types.NOTIFICATION_SERVICE)
 	if err != nil {
 		fmt.Printf("resetpasswordsuccess error:\n%+v", err)
 		return fiber.NewError(http.StatusInternalServerError, "Unexpected error happened. Please try again.")
@@ -396,18 +421,15 @@ func (ah *AuthHttpHandler) ResetPassword(c *fiber.Ctx) error {
 
 	go func() {
 		notificationGrpcClient := notification.NewNotificationServiceClient(cc)
-		notificationGrpcClient.UserSucessResetPassword(context.TODO(), &notification.SuccessResetPasswordRequest{
+		_, err = notificationGrpcClient.UserSucessResetPassword(context.TODO(), &notification.SuccessResetPasswordRequest{
 			ReceiverEmail:    user.Email,
 			HtmlTemplateName: "resetPasswordSuccess",
 			Username:         user.Username,
 		})
-
+		if err != nil {
+			fmt.Printf("resetpasswordsuccess error:\n%+v", err)
+		}
 	}()
-
-	// if err != nil {
-	// 	fmt.Printf("resetpasswordsuccess error:\n%+v", err)
-	// 	return fiber.NewError(http.StatusInternalServerError, "Error sending email")
-	// }
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{
 		"message": "password reseted",
@@ -426,8 +448,9 @@ func (ah *AuthHttpHandler) ChangePassword(c *fiber.Ctx) error {
 
 	err := ah.validate.Struct(obj)
 	if err != nil {
-		fmt.Printf("changepassword error:\n%+v", err)
-		return fiber.NewError(http.StatusBadRequest, "invalid data")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"errors": util.CustomValidationErrors(err),
+		})
 	}
 
 	userInfo, ok := c.UserContext().Value("current_user").(*types.JWTClaims)
@@ -435,7 +458,7 @@ func (ah *AuthHttpHandler) ChangePassword(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusUnauthorized, "sign in first")
 	}
 
-	user, err := ah.authSvc.FindUserByIDIncPassword(ctx, userInfo.UserID)
+	user, err := ah.authSvc.FindUserByUsernameOrEmailIncPassword(ctx, userInfo.Email)
 	if err != nil {
 		fmt.Printf("changepassword error:\n%+v", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) {

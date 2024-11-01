@@ -11,3 +11,8 @@ type Buyer struct {
 	IsSeller       bool      `json:"isSeller" gorm:"not null; default:false;"`
 	CreatedAt      time.Time `json:"createdAt" gorm:"not null" validate:"required"`
 }
+
+type EditBuyerDTO struct {
+	Country        string `json:"country" validate:"required"`
+	ProfilePicture string `json:"profilePicture" validate:"required"`
+}

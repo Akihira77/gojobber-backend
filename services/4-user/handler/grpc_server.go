@@ -33,7 +33,7 @@ func (h *UserGRPCHandler) SaveBuyerData(ctx context.Context, req *user.SaveBuyer
 		Message: "",
 	}
 
-	b := &types.Buyer{
+	b := types.Buyer{
 		ID:             req.Id,
 		Username:       req.Username,
 		Email:          req.Email,
@@ -43,7 +43,7 @@ func (h *UserGRPCHandler) SaveBuyerData(ctx context.Context, req *user.SaveBuyer
 		CreatedAt:      req.CreatedAt.AsTime(),
 	}
 
-	err := h.buyerSvc.Create(ctx, *b)
+	err := h.buyerSvc.Create(ctx, b)
 	if err != nil {
 		res.Message = err.Error()
 		log.Println("Error", err)
@@ -54,17 +54,58 @@ func (h *UserGRPCHandler) SaveBuyerData(ctx context.Context, req *user.SaveBuyer
 	return res, nil
 }
 
-func (h *UserGRPCHandler) FindSeller(ctx context.Context, req *user.FindSellerRequest) (*user.FindSellerResponse, error) {
+func (h *UserGRPCHandler) FindBuyer(ctx context.Context, req *user.FindBuyerRequest) (*user.FindBuyerResponse, error) {
 	log.Println("FindSeller receive data", req)
-	seller, err := h.sellerSvc.FindSellerOverviewByID(ctx, req.SellerId)
+	b, err := h.buyerSvc.FindBuyerByID(ctx, req.BuyerId)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println(seller.FullName, seller.RatingsCount, seller.RatingSum)
+	return &user.FindBuyerResponse{
+		Id:             b.ID,
+		Username:       b.Username,
+		Email:          b.Email,
+		Country:        b.Country,
+		ProfilePicture: b.ProfilePicture,
+	}, nil
+}
+
+func (h *UserGRPCHandler) FindSeller(ctx context.Context, req *user.FindSellerRequest) (*user.FindSellerResponse, error) {
+	log.Println("FindSeller receive data", req)
+	s, err := h.sellerSvc.FindSellerOverviewByID(ctx, req.BuyerId, req.SellerId)
+	if err != nil {
+		return nil, err
+	}
 
 	return &user.FindSellerResponse{
+		Id:           s.ID,
+		FullName:     s.FullName,
+		Email:        s.Email,
+		RatingsCount: int64(s.RatingsCount),
+		RatingSum:    int64(s.RatingSum),
+		RatingCategories: &user.RatingCategory{
+			One:   int32(s.RatingCategories.One),
+			Two:   int32(s.RatingCategories.Two),
+			Three: int32(s.RatingCategories.Three),
+			Four:  int32(s.RatingCategories.Four),
+			Five:  int32(s.RatingCategories.Five),
+		},
+		StripeAccountId: s.StripeAccountID,
+	}, nil
+}
+
+func (h *UserGRPCHandler) UpdateSellerBalance(ctx context.Context, req *user.UpdateSellerBalanceRequest) (*user.UpdateSellerBalanceResponse, error) {
+	log.Println("UpdateSellerBalance receive data", req)
+	seller, err := h.sellerSvc.UpdateBalance(ctx, req.SellerId, req.Amount)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user.UpdateSellerBalanceResponse{
+		Id:           seller.ID,
+		Bio:          seller.Bio,
 		FullName:     seller.FullName,
+		Email:        seller.Email,
 		RatingsCount: int64(seller.RatingsCount),
 		RatingSum:    int64(seller.RatingSum),
 		RatingCategories: &user.RatingCategory{
@@ -74,5 +115,8 @@ func (h *UserGRPCHandler) FindSeller(ctx context.Context, req *user.FindSellerRe
 			Four:  int32(seller.RatingCategories.Four),
 			Five:  int32(seller.RatingCategories.Five),
 		},
+		StripeAccountID: seller.StripeAccountID,
+		AccountBalance:  seller.AccountBalance,
 	}, nil
+
 }
